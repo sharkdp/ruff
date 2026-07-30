@@ -2413,7 +2413,7 @@ struct ScopedTarget<'t> {
 #[derive(Clone, Debug)]
 enum ImportStatement<'a> {
     FromImport(FromImport<'a>),
-    Import(Import<'a>),
+    Import(ImportKind),
     Incomplete(IncompleteImport),
 }
 
@@ -2446,15 +2446,6 @@ enum FromImportKind {
         import_keyword_allowed: bool,
     },
     Attribute,
-}
-
-/// A representation of the completion context for a possibly incomplete
-/// `import ...` statement.
-#[derive(Clone, Debug)]
-struct Import<'a> {
-    #[expect(dead_code)]
-    ast: &'a ast::StmtImport,
-    kind: ImportKind,
 }
 
 /// The kind of completions to offer for an `import` statement.
@@ -2827,7 +2818,7 @@ impl<'a> ImportStatement<'a> {
         match (from, import) {
             (None, None) => None,
             (None, Some(import)) => {
-                let ast = find_ast_for_import(cursor.parsed, import)?;
+                find_ast_for_import(cursor.parsed, import)?;
                 // If we found a dot near the cursor, then this
                 // must be a request for submodule completions.
                 let kind = if initial_dot {
@@ -2839,7 +2830,7 @@ impl<'a> ImportStatement<'a> {
                 } else {
                     ImportKind::Module
                 };
-                Some(ImportStatement::Import(Import { ast, kind }))
+                Some(ImportStatement::Import(kind))
             }
             (Some(from), import) => {
                 let ast = find_ast_for_from_import(cursor.parsed, from)?;
@@ -2904,7 +2895,7 @@ impl<'a> ImportStatement<'a> {
     ) {
         let model = SemanticModel::new(db, file);
         match *self {
-            ImportStatement::Import(Import { ref kind, .. }) => match *kind {
+            ImportStatement::Import(ref kind) => match *kind {
                 ImportKind::Module => {
                     add_import_completions(db, completions, model.import_completions());
                 }
