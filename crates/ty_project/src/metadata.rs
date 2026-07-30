@@ -1257,99 +1257,34 @@ unclosed table, expected `]`
         Ok(())
     }
     #[test]
-    fn requires_python_major_minor() -> anyhow::Result<()> {
-        let system = TestSystem::default();
-        let root = SystemPathBuf::from("/app");
-
-        system
-            .memory_file_system()
-            .write_file_all(
+    fn requires_python_version_components() -> anyhow::Result<()> {
+        for (specifier, expected_version) in [
+            (">=3.12", PythonVersion::PY312),
+            (">=3", PythonVersion::PY37),
+            // Patch components are simplified to the corresponding major/minor version.
+            (">=3.12.8", PythonVersion::PY312),
+        ] {
+            let system = TestSystem::default();
+            let root = SystemPathBuf::from("/app");
+            system.memory_file_system().write_file_all(
                 root.join("pyproject.toml"),
-                r#"
-                [project]
-                requires-python = ">=3.12"
-                "#,
-            )
-            .context("Failed to write file")?;
+                &format!("[project]\nrequires-python = {specifier:?}"),
+            )?;
 
-        let root = ProjectMetadata::discover(&root, &system)?;
-
-        assert_eq!(
-            root.options
-                .environment
-                .unwrap_or_default()
-                .python_version
-                .as_deref()
-                .copied()
-                .map(PythonVersion::from),
-            Some(PythonVersion::PY312)
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn requires_python_major_only() -> anyhow::Result<()> {
-        let system = TestSystem::default();
-        let root = SystemPathBuf::from("/app");
-
-        system
-            .memory_file_system()
-            .write_file_all(
-                root.join("pyproject.toml"),
-                r#"
-                [project]
-                requires-python = ">=3"
-                "#,
-            )
-            .context("Failed to write file")?;
-
-        let root = ProjectMetadata::discover(&root, &system)?;
-
-        assert_eq!(
-            root.options
-                .environment
-                .unwrap_or_default()
-                .python_version
-                .as_deref()
-                .copied()
-                .map(PythonVersion::from),
-            Some(PythonVersion::PY37)
-        );
-
-        Ok(())
-    }
-
-    /// A `requires-python` constraint with major, minor and patch can be simplified
-    /// to major and minor (e.g. 3.12.1 -> 3.12).
-    #[test]
-    fn requires_python_major_minor_patch() -> anyhow::Result<()> {
-        let system = TestSystem::default();
-        let root = SystemPathBuf::from("/app");
-
-        system
-            .memory_file_system()
-            .write_file_all(
-                root.join("pyproject.toml"),
-                r#"
-                [project]
-                requires-python = ">=3.12.8"
-                "#,
-            )
-            .context("Failed to write file")?;
-
-        let root = ProjectMetadata::discover(&root, &system)?;
-
-        assert_eq!(
-            root.options
-                .environment
-                .unwrap_or_default()
-                .python_version
-                .as_deref()
-                .copied()
-                .map(PythonVersion::from),
-            Some(PythonVersion::PY312)
-        );
+            let metadata = ProjectMetadata::discover(&root, &system)?;
+            assert_eq!(
+                metadata
+                    .options
+                    .environment
+                    .unwrap_or_default()
+                    .python_version
+                    .as_deref()
+                    .copied()
+                    .map(PythonVersion::from),
+                Some(expected_version),
+                "requires-python = {specifier}",
+            );
+        }
 
         Ok(())
     }
