@@ -2,7 +2,6 @@ use crate::Session;
 use crate::server::{Action, ConnectionSender, SendRequest};
 use crate::server::{Event, MainLoopSender};
 use lsp_server::{ErrorCode, Message, Notification, RequestId, ResponseError};
-use serde_json::Value;
 use std::fmt::Display;
 
 #[derive(Debug, Clone)]
@@ -110,24 +109,6 @@ impl Client {
             tracing::error!(
                 "Failed to send notification `{method}` because the client sender is closed: {err}",
                 method = N::METHOD,
-            );
-        }
-    }
-
-    /// Sends a notification without any parameters to the client.
-    ///
-    /// This is useful for notifications that don't require any data.
-    #[expect(dead_code)]
-    pub(crate) fn send_notification_no_params(&self, method: &str) {
-        if let Err(err) =
-            self.client_sender
-                .send(lsp_server::Message::Notification(Notification::new(
-                    method.to_string(),
-                    Value::Null,
-                )))
-        {
-            tracing::error!(
-                "Failed to send notification `{method}` because the client sender is closed: {err}",
             );
         }
     }
