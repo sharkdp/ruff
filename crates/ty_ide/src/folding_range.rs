@@ -6,7 +6,8 @@ use ruff_python_ast::visitor::source_order::{
     SourceOrderVisitor, TraversalSignal, walk_body, walk_node,
 };
 use ruff_python_ast::{
-    AnyNodeRef, ExprAttribute, ExprCall, ExprGenerator, ExprRef, ExprSubscript, Stmt,
+    AnyNodeRef, ExprAttribute, ExprCall, ExprGenerator, ExprRef, ExprSubscript, Stmt, StmtFor,
+    StmtWhile,
 };
 use ruff_python_trivia::{CommentLinePosition, is_python_whitespace};
 use ruff_source_file::{LineRanges, UniversalNewlines};
@@ -620,27 +621,16 @@ impl<'a> SourceOrderVisitor<'a> for FoldingRangeVisitor<'a> {
                 // Each elif/else clause has its own range.
                 self.add_block_ranges(node, &clause.body);
             }
-            AnyNodeRef::StmtFor(for_stmt) => {
-                // Fold the for body separately from the else block.
-                self.add_block_ranges(node, &for_stmt.body);
-                if let Some(body_last) = for_stmt.body.last() {
+            AnyNodeRef::StmtFor(StmtFor { body, orelse, .. })
+            | AnyNodeRef::StmtWhile(StmtWhile { body, orelse, .. }) => {
+                // Fold the loop body separately from the else block.
+                self.add_block_ranges(node, body);
+                if let Some(body_last) = body.last() {
                     self.add_block_ranges_after_keyword(
                         node,
                         TokenKind::Else,
                         body_last.end(),
-                        &for_stmt.orelse,
-                    );
-                }
-            }
-            AnyNodeRef::StmtWhile(while_stmt) => {
-                // Fold the while body separately from the else block.
-                self.add_block_ranges(node, &while_stmt.body);
-                if let Some(body_last) = while_stmt.body.last() {
-                    self.add_block_ranges_after_keyword(
-                        node,
-                        TokenKind::Else,
-                        body_last.end(),
-                        &while_stmt.orelse,
+                        orelse,
                     );
                 }
             }
