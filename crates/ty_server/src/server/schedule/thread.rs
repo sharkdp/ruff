@@ -71,34 +71,18 @@ impl Builder {
         })?;
 
         Ok(JoinHandle {
-            inner: Some(inner_handle),
-            allow_leak: false,
+            inner: inner_handle,
         })
     }
 }
 
 pub(crate) struct JoinHandle<T = ()> {
-    // `inner` is an `Option` so that we can
-    // take ownership of the contained `JoinHandle`.
-    inner: Option<jod_thread::JoinHandle<T>>,
-    allow_leak: bool,
+    inner: jod_thread::JoinHandle<T>,
 }
 
 impl<T> JoinHandle<T> {
-    pub(crate) fn join(mut self) -> T {
-        self.inner.take().unwrap().join()
-    }
-}
-
-impl<T> Drop for JoinHandle<T> {
-    fn drop(&mut self) {
-        if !self.allow_leak {
-            return;
-        }
-
-        if let Some(join_handle) = self.inner.take() {
-            join_handle.detach();
-        }
+    pub(crate) fn join(self) -> T {
+        self.inner.join()
     }
 }
 
