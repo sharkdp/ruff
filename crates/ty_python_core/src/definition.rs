@@ -359,136 +359,41 @@ pub(crate) enum DefinitionNodeRef<'ast, 'db> {
     LoopHeader(LoopHeaderDefinitionNodeRef<'ast>),
 }
 
-impl<'ast> From<&'ast ast::StmtFunctionDef> for DefinitionNodeRef<'ast, '_> {
-    fn from(node: &'ast ast::StmtFunctionDef) -> Self {
-        Self::Function(node)
-    }
+macro_rules! impl_from_definition_node_ref {
+    ($($node:ty => $variant:ident),+ $(,)?) => {
+        $(
+            impl<'ast, 'db> From<$node> for DefinitionNodeRef<'ast, 'db> {
+                fn from(node: $node) -> Self {
+                    Self::$variant(node)
+                }
+            }
+        )+
+    };
 }
 
-impl<'ast> From<&'ast ast::StmtClassDef> for DefinitionNodeRef<'ast, '_> {
-    fn from(node: &'ast ast::StmtClassDef) -> Self {
-        Self::Class(node)
-    }
-}
-
-impl<'ast> From<&'ast ast::StmtTypeAlias> for DefinitionNodeRef<'ast, '_> {
-    fn from(node: &'ast ast::StmtTypeAlias) -> Self {
-        Self::TypeAlias(node)
-    }
-}
-
-impl<'ast> From<&'ast ast::ExprNamed> for DefinitionNodeRef<'ast, '_> {
-    fn from(node: &'ast ast::ExprNamed) -> Self {
-        Self::NamedExpression(node)
-    }
-}
-
-impl<'ast> From<&'ast ast::StmtAugAssign> for DefinitionNodeRef<'ast, '_> {
-    fn from(node: &'ast ast::StmtAugAssign) -> Self {
-        Self::AugmentedAssignment(node)
-    }
-}
-
-impl<'ast> From<&'ast ast::TypeParamTypeVar> for DefinitionNodeRef<'ast, '_> {
-    fn from(value: &'ast ast::TypeParamTypeVar) -> Self {
-        Self::TypeVar(value)
-    }
-}
-
-impl<'ast> From<&'ast ast::TypeParamParamSpec> for DefinitionNodeRef<'ast, '_> {
-    fn from(value: &'ast ast::TypeParamParamSpec) -> Self {
-        Self::ParamSpec(value)
-    }
-}
-
-impl<'ast> From<&'ast ast::TypeParamTypeVarTuple> for DefinitionNodeRef<'ast, '_> {
-    fn from(value: &'ast ast::TypeParamTypeVarTuple) -> Self {
-        Self::TypeVarTuple(value)
-    }
-}
-
-impl<'ast> From<LoopHeaderDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '_> {
-    fn from(value: LoopHeaderDefinitionNodeRef<'ast>) -> Self {
-        Self::LoopHeader(value)
-    }
-}
-
-impl<'ast> From<ImportDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '_> {
-    fn from(node_ref: ImportDefinitionNodeRef<'ast>) -> Self {
-        Self::Import(node_ref)
-    }
-}
-
-impl<'ast> From<ImportFromDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '_> {
-    fn from(node_ref: ImportFromDefinitionNodeRef<'ast>) -> Self {
-        Self::ImportFrom(node_ref)
-    }
-}
-
-impl<'ast> From<ImportFromSubmoduleDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '_> {
-    fn from(node_ref: ImportFromSubmoduleDefinitionNodeRef<'ast>) -> Self {
-        Self::ImportFromSubmodule(node_ref)
-    }
-}
-
-impl<'ast, 'db> From<ForStmtDefinitionNodeRef<'ast, 'db>> for DefinitionNodeRef<'ast, 'db> {
-    fn from(value: ForStmtDefinitionNodeRef<'ast, 'db>) -> Self {
-        Self::For(value)
-    }
-}
-
-impl<'ast, 'db> From<AssignmentDefinitionNodeRef<'ast, 'db>> for DefinitionNodeRef<'ast, 'db> {
-    fn from(node_ref: AssignmentDefinitionNodeRef<'ast, 'db>) -> Self {
-        Self::Assignment(node_ref)
-    }
-}
-
-impl<'ast> From<AnnotatedAssignmentDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '_> {
-    fn from(node_ref: AnnotatedAssignmentDefinitionNodeRef<'ast>) -> Self {
-        Self::AnnotatedAssignment(node_ref)
-    }
-}
-
-impl<'ast, 'db> From<DictKeyAssignmentNodeRef<'ast, 'db>> for DefinitionNodeRef<'ast, 'db> {
-    fn from(node_ref: DictKeyAssignmentNodeRef<'ast, 'db>) -> Self {
-        Self::DictKeyAssignment(node_ref)
-    }
-}
-
-impl<'ast, 'db> From<WithItemDefinitionNodeRef<'ast, 'db>> for DefinitionNodeRef<'ast, 'db> {
-    fn from(node_ref: WithItemDefinitionNodeRef<'ast, 'db>) -> Self {
-        Self::WithItem(node_ref)
-    }
-}
-
-impl<'ast, 'db> From<ComprehensionDefinitionNodeRef<'ast, 'db>> for DefinitionNodeRef<'ast, 'db> {
-    fn from(node: ComprehensionDefinitionNodeRef<'ast, 'db>) -> Self {
-        Self::Comprehension(node)
-    }
-}
-
-impl<'ast> From<ParameterDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '_> {
-    fn from(node: ParameterDefinitionNodeRef<'ast>) -> Self {
-        Self::Parameter(node)
-    }
-}
-
-impl<'ast> From<LambdaParameterDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '_> {
-    fn from(node: LambdaParameterDefinitionNodeRef<'ast>) -> Self {
-        Self::LambdaParameter(node)
-    }
-}
-
-impl<'ast, 'db> From<MatchPatternDefinitionNodeRef<'ast, 'db>> for DefinitionNodeRef<'ast, 'db> {
-    fn from(node: MatchPatternDefinitionNodeRef<'ast, 'db>) -> Self {
-        Self::MatchPattern(node)
-    }
-}
-
-impl<'ast> From<StarImportDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '_> {
-    fn from(node: StarImportDefinitionNodeRef<'ast>) -> Self {
-        Self::ImportStar(node)
-    }
+impl_from_definition_node_ref! {
+    &'ast ast::StmtFunctionDef => Function,
+    &'ast ast::StmtClassDef => Class,
+    &'ast ast::StmtTypeAlias => TypeAlias,
+    &'ast ast::ExprNamed => NamedExpression,
+    &'ast ast::StmtAugAssign => AugmentedAssignment,
+    &'ast ast::TypeParamTypeVar => TypeVar,
+    &'ast ast::TypeParamParamSpec => ParamSpec,
+    &'ast ast::TypeParamTypeVarTuple => TypeVarTuple,
+    LoopHeaderDefinitionNodeRef<'ast> => LoopHeader,
+    ImportDefinitionNodeRef<'ast> => Import,
+    ImportFromDefinitionNodeRef<'ast> => ImportFrom,
+    ImportFromSubmoduleDefinitionNodeRef<'ast> => ImportFromSubmodule,
+    ForStmtDefinitionNodeRef<'ast, 'db> => For,
+    AssignmentDefinitionNodeRef<'ast, 'db> => Assignment,
+    AnnotatedAssignmentDefinitionNodeRef<'ast> => AnnotatedAssignment,
+    DictKeyAssignmentNodeRef<'ast, 'db> => DictKeyAssignment,
+    WithItemDefinitionNodeRef<'ast, 'db> => WithItem,
+    ComprehensionDefinitionNodeRef<'ast, 'db> => Comprehension,
+    ParameterDefinitionNodeRef<'ast> => Parameter,
+    LambdaParameterDefinitionNodeRef<'ast> => LambdaParameter,
+    MatchPatternDefinitionNodeRef<'ast, 'db> => MatchPattern,
+    StarImportDefinitionNodeRef<'ast> => ImportStar,
 }
 
 #[derive(Copy, Clone, Debug)]
