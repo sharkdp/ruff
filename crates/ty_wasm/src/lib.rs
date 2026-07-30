@@ -942,20 +942,17 @@ impl Diagnostic {
 
     #[wasm_bindgen(js_name = "textRange")]
     pub fn text_range(&self) -> Option<TextRange> {
-        self.inner
-            .primary_span()
-            .and_then(|span| Some(TextRange::from(span.range()?)))
+        self.inner.primary_span()?.range().map(TextRange::from)
     }
 
     #[wasm_bindgen(js_name = "toRange")]
     pub fn to_range(&self, workspace: &Workspace) -> Option<Range> {
-        self.inner.primary_span().and_then(|span| {
-            Some(Range::from_file_range(
-                &workspace.db,
-                FileRange::new(span.expect_ty_file(), span.range()?),
-                workspace.position_encoding,
-            ))
-        })
+        let span = self.inner.primary_span()?;
+        Some(Range::from_file_range(
+            &workspace.db,
+            FileRange::new(span.expect_ty_file(), span.range()?),
+            workspace.position_encoding,
+        ))
     }
 
     #[wasm_bindgen]
