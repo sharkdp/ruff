@@ -2274,15 +2274,6 @@ enum CompletionTargetTokens<'t> {
     PossibleObjectDot {
         /// The token preceding the dot.
         object: &'t Token,
-        /// The token, if non-empty, following the dot.
-        ///
-        /// For right now, this is only used to determine which
-        /// module in an `import` statement to return submodule
-        /// completions for. But we could use it for other things,
-        /// like only returning completions that start with a prefix
-        /// corresponding to this token.
-        #[expect(dead_code)]
-        attribute: Option<&'t Token>,
     },
     /// A token was found under the cursor, but it didn't
     /// match any of our anticipated token patterns.
@@ -2306,18 +2297,12 @@ impl<'t> CompletionTargetTokens<'t> {
             // that's the object we try to complete attributes for.
             if let Some([_dot]) = token_suffix_by_kinds(before, OBJECT_DOT_EMPTY) {
                 let object = before[..before.len() - 1].last()?;
-                CompletionTargetTokens::PossibleObjectDot {
-                    object,
-                    attribute: None,
-                }
+                CompletionTargetTokens::PossibleObjectDot { object }
             } else if let [.., object, dot, attribute] = before
                 && dot.kind() == TokenKind::Dot
                 && is_name_like_token(attribute)
             {
-                CompletionTargetTokens::PossibleObjectDot {
-                    object,
-                    attribute: Some(attribute),
-                }
+                CompletionTargetTokens::PossibleObjectDot { object }
             } else if let Some([_]) = token_suffix_by_kinds(before, [TokenKind::Float]) {
                 // If we're writing a `float`, then we should
                 // specifically not offer completions. This wouldn't
@@ -2349,7 +2334,7 @@ impl<'t> CompletionTargetTokens<'t> {
     /// If no plausible AST node could be found, then `None` is returned.
     fn ast(&self, cursor: &ContextCursor<'t>) -> Option<CompletionTargetAst<'t>> {
         match *self {
-            CompletionTargetTokens::PossibleObjectDot { object, .. } => {
+            CompletionTargetTokens::PossibleObjectDot { object } => {
                 let covering_node = cursor
                     .covering_node(object.range())
                     .find_last(|node| {
