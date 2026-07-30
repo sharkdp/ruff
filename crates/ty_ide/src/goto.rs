@@ -413,26 +413,15 @@ impl<'db> Definitions<'db> {
     /// so this will check both the goto-declarations and goto-definitions (in that order)
     /// and return the first one found.
     pub(crate) fn docstring(self, db: &'db dyn crate::Db) -> Option<Docstring> {
-        for definition in &self {
-            // If we got a docstring from the original definition, use it
-            if let Some(docstring) = definition.docstring(db) {
-                return Some(Docstring::new(docstring));
-            }
-        }
-
-        // If the definition is located within a stub file and no docstring
-        // is present, try to map the symbol to an implementation file and extract
-        // the docstring from that location.
-        let stub_mapper = StubMapper::new(db);
-
-        // Try to find the corresponding implementation definition
-        for definition in stub_mapper.map_definitions(self.0) {
-            if let Some(docstring) = definition.docstring(db) {
-                return Some(Docstring::new(docstring));
-            }
-        }
-
-        None
+        self.iter()
+            .find_map(|definition| definition.docstring(db))
+            .or_else(|| {
+                StubMapper::new(db)
+                    .map_definitions(self.0)
+                    .into_iter()
+                    .find_map(|definition| definition.docstring(db))
+            })
+            .map(Docstring::new)
     }
 
     /// Return true if `self` and `other` contain at least one shared `definition`.
