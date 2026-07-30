@@ -104,12 +104,6 @@ pub(crate) enum FutureDefinitions {
     DontShadowThisOne,
 }
 
-impl PreviousDefinitions {
-    pub(super) fn are_shadowed(self) -> bool {
-        matches!(self, PreviousDefinitions::AreShadowed)
-    }
-}
-
 impl Declarations {
     pub(super) fn undeclared_reachability_constraint(
         &self,
@@ -148,7 +142,7 @@ impl Declarations {
         reachability_constraint: ScopedReachabilityConstraintId,
         previous_definitions: PreviousDefinitions,
     ) {
-        if previous_definitions.are_shadowed() {
+        if matches!(previous_definitions, PreviousDefinitions::AreShadowed) {
             // The new declaration replaces all previous live declaration in this path.
             self.live_declarations.clear();
         }
@@ -373,7 +367,7 @@ impl Bindings {
         }
         // If the new binding is a shadowing type, it replaces previous live bindings in this path
         // (unless they're marked as not shadowable), and has no constraints.
-        if previous_definitions.are_shadowed() {
+        if matches!(previous_definitions, PreviousDefinitions::AreShadowed) {
             self.live_bindings
                 .retain(|b| b.can_be_shadowed() == FutureDefinitions::DontShadowThisOne);
         }
