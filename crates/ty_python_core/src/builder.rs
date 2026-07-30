@@ -222,10 +222,7 @@ enum ConditionFlowSnapshot {
 
 impl ConditionFlowSnapshot {
     fn into_truthy(self) -> Option<FlowSnapshot> {
-        match self {
-            Self::Fallback => None,
-            Self::Branches(snapshots) => Some(snapshots.truthy),
-        }
+        self.into_branches().map(|snapshots| snapshots.truthy)
     }
 
     fn into_branches(self) -> Option<ConditionFlowSnapshots> {
