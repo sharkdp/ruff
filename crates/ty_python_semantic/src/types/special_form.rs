@@ -1096,14 +1096,7 @@ impl TypeQualifier {
         }
     }
     pub(crate) const fn is_valid_for_non_name_targets(self) -> bool {
-        match self {
-            TypeQualifier::ReadOnly
-            | TypeQualifier::Required
-            | TypeQualifier::NotRequired
-            | TypeQualifier::ClassVar
-            | TypeQualifier::InitVar => false,
-            TypeQualifier::Final => true,
-        }
+        matches!(self, Self::Final)
     }
 
     pub(crate) const fn is_valid_in_typeddict_field(self) -> bool {
