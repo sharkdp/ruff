@@ -8,6 +8,8 @@ use itertools::Either;
 
 use crate::Db;
 
+static_assertions::const_assert!(usize::BITS >= i32::BITS);
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct OutOfBoundsError;
 
@@ -18,22 +20,13 @@ pub(crate) trait PyIndex<'db> {
 }
 
 fn from_nonnegative_i32(index: i32) -> usize {
-    static_assertions::const_assert!(usize::BITS >= 32);
     debug_assert!(index >= 0);
-
-    usize::try_from(index)
-        .expect("Should only ever pass a positive integer to `from_nonnegative_i32`")
+    index as usize
 }
 
 fn from_negative_i32(index: i32) -> usize {
-    static_assertions::const_assert!(usize::BITS >= 32);
-
-    index.checked_neg().map(from_nonnegative_i32).unwrap_or({
-        // 'checked_neg' only fails for i32::MIN. We cannot
-        // represent -i32::MIN as a i32, but we can represent
-        // it as a usize, since usize is at least 32 bits.
-        from_nonnegative_i32(i32::MAX) + 1
-    })
+    debug_assert!(index < 0);
+    index.unsigned_abs() as usize
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
