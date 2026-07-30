@@ -50,7 +50,6 @@ use crate::{
         tuple::Tuple,
         typevar::TypeVarInstance,
         variance::VarianceInferable,
-        visitor::find_over_type,
     },
 };
 use crate::{attribute_assignments, types::diagnostic::abstract_method_span};
@@ -832,37 +831,20 @@ pub(crate) fn check_static_class_definitions<'db>(
             .pep695_generic_context(db)
             .or_else(|| class.legacy_generic_context(db))
         {
-            let typevars = generic_context.variables(db).map(|btv| btv.typevar(db));
-
-            // `variables` should be fairly cheap to clone; it's just several cheap wrappers around
-            // a `std::slice::Iter` under the hood.
-            for (i, typevar) in typevars.clone().enumerate() {
-                let Some(default_ty) = typevar.default_type(db) else {
-                    continue;
-                };
-
-                let first_bad_tvar = find_over_type(db, default_ty, false, |t| {
-                    let tvar = match t {
-                        Type::TypeVar(tvar) => tvar.typevar(db),
-                        Type::KnownInstance(KnownInstanceType::TypeVar(tvar)) => tvar,
-                        _ => return None,
-                    };
-                    if !typevars.clone().take(i).contains(&tvar) {
-                        Some(tvar)
-                    } else {
-                        None
-                    }
-                });
-                if let Some(bad_typevar) = first_bad_tvar {
-                    let is_later_in_list = typevars.clone().skip(i).contains(&bad_typevar);
-                    report_invalid_typevar_default_reference(
-                        context,
-                        class,
-                        typevar,
-                        bad_typevar,
-                        is_later_in_list,
-                    );
-                }
+            for (typevar, bad_typevar, is_later_in_list) in
+                super::type_param_validation::invalid_typevar_default_references(
+                    db,
+                    generic_context,
+                    |_| true,
+                )
+            {
+                report_invalid_typevar_default_reference(
+                    context,
+                    class,
+                    typevar,
+                    bad_typevar,
+                    is_later_in_list,
+                );
             }
         }
 

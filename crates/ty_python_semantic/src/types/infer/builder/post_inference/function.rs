@@ -15,7 +15,6 @@ use crate::{
         visitor::find_over_type,
     },
 };
-use itertools::Itertools;
 use ruff_db::{
     diagnostic::{Annotation, Span},
     parsed::parsed_module,
@@ -199,45 +198,23 @@ fn check_legacy_typevar_defaults<'db>(
         return;
     };
 
-    let typevars = generic_context
-        .variables(db)
-        .map(|bound_tvar| bound_tvar.typevar(db));
+    // Only check legacy TypeVars; PEP 695 type parameters are already validated
+    // by `check_default_for_outer_scope_typevars` in the type parameter scope.
+    let invalid_defaults = super::type_param_validation::invalid_typevar_default_references(
+        db,
+        generic_context,
+        |typevar| {
+            matches!(
+                typevar.kind(db),
+                TypeVarKind::LegacyTypeVar
+                    | TypeVarKind::Pep613Alias
+                    | TypeVarKind::LegacyParamSpec
+                    | TypeVarKind::LegacyTypeVarTuple
+            )
+        },
+    );
 
-    for (i, typevar) in typevars.clone().enumerate() {
-        // Only check legacy TypeVars; PEP 695 type parameters are already validated
-        // by `check_default_for_outer_scope_typevars` in the type parameter scope.
-        if !matches!(
-            typevar.kind(db),
-            TypeVarKind::LegacyTypeVar
-                | TypeVarKind::Pep613Alias
-                | TypeVarKind::LegacyParamSpec
-                | TypeVarKind::LegacyTypeVarTuple
-        ) {
-            continue;
-        }
-
-        let Some(default_ty) = typevar.default_type(db) else {
-            continue;
-        };
-
-        let first_bad_tvar = find_over_type(db, default_ty, false, |t| {
-            let tvar = match t {
-                Type::TypeVar(tvar) => tvar.typevar(db),
-                Type::KnownInstance(KnownInstanceType::TypeVar(tvar)) => tvar,
-                _ => return None,
-            };
-            if !typevars.clone().take(i).contains(&tvar) {
-                Some(tvar)
-            } else {
-                None
-            }
-        });
-
-        let Some(bad_typevar) = first_bad_tvar else {
-            continue;
-        };
-
-        let is_later_in_list = typevars.clone().skip(i).contains(&bad_typevar);
+    for (typevar, bad_typevar, is_later_in_list) in invalid_defaults {
         let node = last_definition.node(db, context.file(), context.module());
 
         let primary_range =

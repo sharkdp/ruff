@@ -1,16 +1,61 @@
 use ruff_python_ast::{self as ast, name::Name};
 use ruff_text_size::Ranged;
 
+use crate::Db;
 use crate::diagnostic::format_enumeration;
 use crate::types::{
+    KnownInstanceType, Type,
     context::InferContext,
     diagnostic::{INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_DEFAULT},
+    generics::GenericContext,
+    typevar::TypeVarInstance,
+    visitor::find_over_type,
 };
 
 #[derive(Clone, Copy)]
 pub(crate) enum TypeParameterOwner<'a> {
     GenericClass(&'a Name),
     TypeAlias(&'a Name),
+}
+
+/// Find defaults that reference a type variable outside their preceding parameters.
+pub(crate) fn invalid_typevar_default_references<'db>(
+    db: &'db dyn Db,
+    generic_context: GenericContext<'db>,
+    should_check: impl Fn(TypeVarInstance<'db>) -> bool + 'db,
+) -> impl Iterator<Item = (TypeVarInstance<'db>, TypeVarInstance<'db>, bool)> + 'db {
+    let typevars = generic_context
+        .variables(db)
+        .map(|bound_typevar| bound_typevar.typevar(db));
+
+    typevars
+        .clone()
+        .enumerate()
+        .filter_map(move |(index, typevar)| {
+            if !should_check(typevar) {
+                return None;
+            }
+
+            let default = typevar.default_type(db)?;
+            let invalid_reference = find_over_type(db, default, false, |ty| {
+                let referenced = match ty {
+                    Type::TypeVar(typevar) => typevar.typevar(db),
+                    Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => typevar,
+                    _ => return None,
+                };
+                let is_preceding = typevars
+                    .clone()
+                    .take(index)
+                    .any(|known| known == referenced);
+                (!is_preceding).then_some(referenced)
+            })?;
+
+            let is_later = typevars
+                .clone()
+                .skip(index)
+                .any(|known| known == invalid_reference);
+            Some((typevar, invalid_reference, is_later))
+        })
 }
 
 /// Check that a PEP 695 class or type alias parameter list contains at most one `TypeVarTuple`.
