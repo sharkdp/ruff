@@ -1355,67 +1355,33 @@ unclosed table, expected `]`
     }
 
     #[test]
-    fn requires_python_beta_version() -> anyhow::Result<()> {
-        let system = TestSystem::default();
-        let root = SystemPathBuf::from("/app");
-
-        system
-            .memory_file_system()
-            .write_file_all(
+    fn requires_python_constraint_variants() -> anyhow::Result<()> {
+        for (specifier, expected_version) in [
+            (">= 3.13.0b0", PythonVersion::PY313),
+            // Any 3.12 patch release also satisfies this strictly greater bound.
+            (">3.12", PythonVersion::PY312),
+        ] {
+            let system = TestSystem::default();
+            let root = SystemPathBuf::from("/app");
+            system.memory_file_system().write_file_all(
                 root.join("pyproject.toml"),
-                r#"
-                [project]
-                requires-python = ">= 3.13.0b0"
-                "#,
-            )
-            .context("Failed to write file")?;
+                &format!("[project]\nrequires-python = {specifier:?}"),
+            )?;
 
-        let root = ProjectMetadata::discover(&root, &system)?;
-
-        assert_eq!(
-            root.options
-                .environment
-                .unwrap_or_default()
-                .python_version
-                .as_deref()
-                .copied()
-                .map(PythonVersion::from),
-            Some(PythonVersion::PY313)
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn requires_python_greater_than_major_minor() -> anyhow::Result<()> {
-        let system = TestSystem::default();
-        let root = SystemPathBuf::from("/app");
-
-        system
-            .memory_file_system()
-            .write_file_all(
-                root.join("pyproject.toml"),
-                r#"
-                [project]
-                # This is somewhat nonsensical because 3.12.1 > 3.12 is true.
-                # That's why simplifying the constraint to >= 3.12 is correct
-                requires-python = ">3.12"
-                "#,
-            )
-            .context("Failed to write file")?;
-
-        let root = ProjectMetadata::discover(&root, &system)?;
-
-        assert_eq!(
-            root.options
-                .environment
-                .unwrap_or_default()
-                .python_version
-                .as_deref()
-                .copied()
-                .map(PythonVersion::from),
-            Some(PythonVersion::PY312)
-        );
+            let metadata = ProjectMetadata::discover(&root, &system)?;
+            assert_eq!(
+                metadata
+                    .options
+                    .environment
+                    .unwrap_or_default()
+                    .python_version
+                    .as_deref()
+                    .copied()
+                    .map(PythonVersion::from),
+                Some(expected_version),
+                "requires-python = {specifier}",
+            );
+        }
 
         Ok(())
     }
