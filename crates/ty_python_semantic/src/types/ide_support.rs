@@ -2989,6 +2989,31 @@ mod tests {
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
 
+    fn assert_call_argument_forms(
+        source: &str,
+        expected: &[CallArgumentForm],
+    ) -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file("/src/foo.py", source)
+            .build()?;
+        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
+        let parsed = parsed_module(&db, file).load(&db);
+        let call = parsed
+            .suite()
+            .last()
+            .unwrap()
+            .as_expr_stmt()
+            .unwrap()
+            .value
+            .as_call_expr()
+            .unwrap();
+        let model = SemanticModel::new(&db, file);
+
+        assert_eq!(call_argument_forms(&model, call), expected);
+
+        Ok(())
+    }
+
     #[test]
     fn source_candidate_prefilters_use_identifier_boundaries() {
         for (source, name) in [("x = 1", "x"), ("obj.x", "x"), ("x()", "x")] {
@@ -3002,44 +3027,20 @@ mod tests {
 
     #[test]
     fn keyword_call_argument_forms_follow_source_order() -> anyhow::Result<()> {
-        let db = TestDbBuilder::new()
-            .with_file(
-                "/src/foo.py",
-                r#"
+        assert_call_argument_forms(
+            r#"
 from typing import cast
 
 cast(val="", typ=int)
 "#,
-            )
-            .build()?;
-
-        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, file).load(&db);
-        let call = parsed
-            .suite()
-            .last()
-            .unwrap()
-            .as_expr_stmt()
-            .unwrap()
-            .value
-            .as_call_expr()
-            .unwrap();
-        let model = SemanticModel::new(&db, file);
-
-        assert_eq!(
-            call_argument_forms(&model, call),
-            [CallArgumentForm::Value, CallArgumentForm::Type]
-        );
-
-        Ok(())
+            &[CallArgumentForm::Value, CallArgumentForm::Type],
+        )
     }
 
     #[test]
     fn overloaded_call_argument_forms_follow_source_order() -> anyhow::Result<()> {
-        let db = TestDbBuilder::new()
-            .with_file(
-                "/src/foo.py",
-                r#"
+        assert_call_argument_forms(
+            r#"
 from typing import overload
 
 @overload
@@ -3050,109 +3051,43 @@ def f(*args, **kwargs): ...
 
 f(y="", x=1)
 "#,
-            )
-            .build()?;
-
-        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, file).load(&db);
-        let call = parsed
-            .suite()
-            .last()
-            .unwrap()
-            .as_expr_stmt()
-            .unwrap()
-            .value
-            .as_call_expr()
-            .unwrap();
-        let model = SemanticModel::new(&db, file);
-
-        assert_eq!(
-            call_argument_forms(&model, call),
-            [CallArgumentForm::Value, CallArgumentForm::Value]
-        );
-
-        Ok(())
+            &[CallArgumentForm::Value, CallArgumentForm::Value],
+        )
     }
 
     #[test]
     fn conditional_special_forms_preserve_type_form_information() -> anyhow::Result<()> {
-        let db = TestDbBuilder::new()
-            .with_file(
-                "/src/foo.py",
-                r#"
+        assert_call_argument_forms(
+            r#"
 from typing_extensions import assert_type, cast
 
 flag = bool(input())
 f = cast if flag else assert_type
 f(val="", typ=int)
 "#,
-            )
-            .build()?;
-
-        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, file).load(&db);
-        let call = parsed
-            .suite()
-            .last()
-            .unwrap()
-            .as_expr_stmt()
-            .unwrap()
-            .value
-            .as_call_expr()
-            .unwrap();
-        let model = SemanticModel::new(&db, file);
-
-        assert_eq!(
-            call_argument_forms(&model, call),
-            [CallArgumentForm::Value, CallArgumentForm::Type]
-        );
-
-        Ok(())
+            &[CallArgumentForm::Value, CallArgumentForm::Type],
+        )
     }
 
     #[test]
     fn conditional_special_forms_use_successful_binding_for_positional_arguments()
     -> anyhow::Result<()> {
-        let db = TestDbBuilder::new()
-            .with_file(
-                "/src/foo.py",
-                r#"
+        assert_call_argument_forms(
+            r#"
 from typing_extensions import assert_type, cast
 
 flag = bool(input())
 f = cast if flag else assert_type
 f("", int)
 "#,
-            )
-            .build()?;
-
-        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, file).load(&db);
-        let call = parsed
-            .suite()
-            .last()
-            .unwrap()
-            .as_expr_stmt()
-            .unwrap()
-            .value
-            .as_call_expr()
-            .unwrap();
-        let model = SemanticModel::new(&db, file);
-
-        assert_eq!(
-            call_argument_forms(&model, call),
-            [CallArgumentForm::Value, CallArgumentForm::Type]
-        );
-
-        Ok(())
+            &[CallArgumentForm::Value, CallArgumentForm::Type],
+        )
     }
 
     #[test]
     fn successful_call_argument_forms_ignore_failed_bindings() -> anyhow::Result<()> {
-        let db = TestDbBuilder::new()
-            .with_file(
-                "/src/foo.py",
-                r#"
+        assert_call_argument_forms(
+            r#"
 from typing import cast
 
 flag = bool(input())
@@ -3163,28 +3098,8 @@ x = ""
 f = cast if flag else g
 f(int, x)
 "#,
-            )
-            .build()?;
-
-        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, file).load(&db);
-        let call = parsed
-            .suite()
-            .last()
-            .unwrap()
-            .as_expr_stmt()
-            .unwrap()
-            .value
-            .as_call_expr()
-            .unwrap();
-        let model = SemanticModel::new(&db, file);
-
-        assert_eq!(
-            call_argument_forms(&model, call),
-            [CallArgumentForm::Type, CallArgumentForm::Value]
-        );
-
-        Ok(())
+            &[CallArgumentForm::Type, CallArgumentForm::Value],
+        )
     }
 
     #[test]
@@ -3243,36 +3158,14 @@ TypeAliasType("Alias", int)
     #[test]
     fn variadic_call_argument_forms_are_unknown_when_matched_to_multiple_parameters()
     -> anyhow::Result<()> {
-        let db = TestDbBuilder::new()
-            .with_file(
-                "/src/foo.py",
-                r#"
+        assert_call_argument_forms(
+            r#"
 from typing import cast
 
 args: tuple[str, type[int]] = ("", int)
 cast(*args)
 "#,
-            )
-            .build()?;
-
-        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, file).load(&db);
-        let call = parsed
-            .suite()
-            .last()
-            .unwrap()
-            .as_expr_stmt()
-            .unwrap()
-            .value
-            .as_call_expr()
-            .unwrap();
-        let model = SemanticModel::new(&db, file);
-
-        assert_eq!(
-            call_argument_forms(&model, call),
-            [CallArgumentForm::Unknown]
-        );
-
-        Ok(())
+            &[CallArgumentForm::Unknown],
+        )
     }
 }
