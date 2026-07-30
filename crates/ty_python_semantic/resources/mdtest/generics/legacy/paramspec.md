@@ -590,19 +590,16 @@ def _(concrete: Command[[str]], gradual: Command[...]) -> None:
 ```
 
 `ParamSpec` specializations in generic classes are compared using the callable parameter relation.
-This avoids rejecting wrappers around callbacks that are safe to use with a positional-only callback
-protocol.
-
-```toml
-[environment]
-python-version = "3.12"
-```
+Declaring `P` contravariant matches the variance inferred for a read-only callback and avoids
+rejecting wrappers around callbacks that are safe to use with a positional-only callback protocol.
 
 ```py
 from collections.abc import Callable
-from typing import Final
+from typing import Final, Generic, ParamSpec
 
-class Job[**P]:
+P = ParamSpec("P", contravariant=True)
+
+class Job(Generic[P]):
     target: Final[Callable[P, None]]
 
     def __init__(self, target: Callable[P, None]) -> None:
