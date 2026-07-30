@@ -11772,15 +11772,13 @@ impl StringPartsCollector {
     }
 
     fn push_str(&mut self, literal: &str) {
-        if let Some(mut concatenated) = self.concatenated.take() {
-            if concatenated.len().saturating_add(literal.len())
+        if let Some(concatenated) = self.concatenated.as_mut()
+            && concatenated.len().saturating_add(literal.len())
                 <= TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE
-            {
-                concatenated.push_str(literal);
-                self.concatenated = Some(concatenated);
-            } else {
-                self.concatenated = None;
-            }
+        {
+            concatenated.push_str(literal);
+        } else {
+            self.concatenated = None;
         }
     }
 
