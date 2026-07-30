@@ -48,14 +48,6 @@ impl AnySystemPath {
             AnySystemPath::SystemVirtual(_) => None,
         }
     }
-
-    #[expect(unused)]
-    pub(crate) const fn as_virtual(&self) -> Option<&SystemVirtualPath> {
-        match self {
-            AnySystemPath::SystemVirtual(path) => Some(path.as_path()),
-            AnySystemPath::System(_) => None,
-        }
-    }
 }
 
 impl fmt::Display for AnySystemPath {
