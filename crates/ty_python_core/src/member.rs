@@ -5,11 +5,12 @@ use ruff_text_size::{TextLen as _, TextRange, TextSize};
 use bitflags::bitflags;
 use char_str::{CharStr, CharString, format_char};
 use hashbrown::hash_table::Entry;
-use rustc_hash::FxHasher;
 use smallvec::SmallVec;
 
-use std::hash::{Hash, Hasher as _};
+use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
+
+use crate::place::{hash_key, insert_entry};
 
 // Selected using performance and memory profiling across the 162-project ecosystem corpus.
 // Member-expression equality is relatively expensive, and raising the cutoff to 16 regressed
@@ -504,7 +505,7 @@ impl MemberReverseTable {
         member: &MemberExprRef<'_>,
     ) -> Option<ScopedMemberId> {
         self.0
-            .find(hash_single(member), |id| members[*id].expression == *member)
+            .find(hash_key(member), |id| members[*id].expression == *member)
             .copied()
     }
 
@@ -515,15 +516,15 @@ impl MemberReverseTable {
     ) -> Entry<'a, ScopedMemberId> {
         let member = member.expression.as_ref();
         self.0.entry(
-            hash_single(&member),
+            hash_key(&member),
             |id| members[*id].expression.as_ref() == member,
-            |id| hash_single(&members[*id].expression.as_ref()),
+            |id| hash_key(&members[*id].expression.as_ref()),
         )
     }
 
     fn shrink_to_fit(&mut self, members: &IndexVec<ScopedMemberId, Member>) {
         self.0
-            .shrink_to_fit(|id| hash_single(&members[*id].expression.as_ref()));
+            .shrink_to_fit(|id| hash_key(&members[*id].expression.as_ref()));
     }
 }
 
@@ -621,23 +622,14 @@ impl MemberTableBuilder {
     /// Members are identified by their expression, which is hashed to find the entry in the table.
     pub(super) fn add(&mut self, member: Member) -> (ScopedMemberId, bool) {
         let entry = self.reverse.entry(&self.table.members, &member);
-
-        match entry {
-            Entry::Occupied(entry) => {
-                let id = *entry.get();
-
-                if !member.flags.is_empty() {
-                    self.members[id].flags.insert(member.flags);
-                }
-
-                (id, false)
-            }
-            Entry::Vacant(entry) => {
-                let id = self.table.members.push(member);
-                entry.insert(id);
-                (id, true)
-            }
-        }
+        insert_entry(
+            &mut self.table.members,
+            entry,
+            member,
+            |existing, member| {
+                existing.flags.insert(member.flags);
+            },
+        )
     }
 
     pub(super) fn build(self) -> MemberTable {
@@ -1025,13 +1017,6 @@ impl PartialEq for SegmentsRef<'_> {
 
 impl Eq for SegmentsRef<'_> {}
 
-/// Helper function to hash a single value and return the hash.
-fn hash_single<T: Hash>(value: &T) -> u64 {
-    let mut hasher = FxHasher::default();
-    value.hash(&mut hasher);
-    hasher.finish()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1063,10 +1048,7 @@ mod tests {
         };
 
         // Test hash equality (MemberExprRef only hashes the path).
-        assert_eq!(
-            hash_single(&member_ref_small),
-            hash_single(&member_ref_heap)
-        );
+        assert_eq!(hash_key(&member_ref_small), hash_key(&member_ref_heap));
 
         // Test equality in both directions.
         assert_eq!(member_ref_small, member_ref_heap);
@@ -1109,7 +1091,7 @@ mod tests {
         assert_ne!(member_ref2, member_ref1);
 
         // Test hash equality (MemberExprRef only hashes the path, not segments)
-        assert_eq!(hash_single(&member_ref1), hash_single(&member_ref2));
+        assert_eq!(hash_key(&member_ref1), hash_key(&member_ref2));
     }
 
     #[test]

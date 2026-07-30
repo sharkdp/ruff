@@ -2,9 +2,9 @@ use bitflags::bitflags;
 use hashbrown::hash_table::Entry;
 use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast::name::Name;
-use rustc_hash::FxHasher;
-use std::hash::{Hash as _, Hasher as _};
 use std::ops::{Deref, DerefMut};
+
+use crate::place::{hash_key, insert_entry};
 
 // Selected using performance and memory profiling across the 162-project ecosystem corpus.
 // Symbol-name equality is cheap enough that raising the cutoff from 8 to 16 reduced retained
@@ -172,7 +172,7 @@ impl SymbolReverseTable {
         name: &str,
     ) -> Option<ScopedSymbolId> {
         self.0
-            .find(Self::hash_name(name), |id| symbols[*id].name == name)
+            .find(hash_key(name), |id| symbols[*id].name == name)
             .copied()
     }
 
@@ -182,21 +182,14 @@ impl SymbolReverseTable {
         symbol: &Symbol,
     ) -> Entry<'a, ScopedSymbolId> {
         self.0.entry(
-            Self::hash_name(symbol.name()),
+            hash_key(symbol.name()),
             |id| &symbols[*id].name == symbol.name(),
-            |id| Self::hash_name(&symbols[*id].name),
+            |id| hash_key(&symbols[*id].name),
         )
     }
 
     fn shrink_to_fit(&mut self, symbols: &IndexVec<ScopedSymbolId, Symbol>) {
-        self.0
-            .shrink_to_fit(|id| Self::hash_name(&symbols[*id].name));
-    }
-
-    fn hash_name(name: &str) -> u64 {
-        let mut h = FxHasher::default();
-        name.hash(&mut h);
-        h.finish()
+        self.0.shrink_to_fit(|id| hash_key(&symbols[*id].name));
     }
 }
 
@@ -275,23 +268,14 @@ impl SymbolTableBuilder {
     /// Add a new symbol to this scope or update the flags if a symbol with the same name already exists.
     pub(super) fn add(&mut self, symbol: Symbol) -> (ScopedSymbolId, bool) {
         let entry = self.reverse.entry(&self.table.symbols, &symbol);
-
-        match entry {
-            Entry::Occupied(entry) => {
-                let id = *entry.get();
-
-                if !symbol.flags.is_empty() {
-                    self.symbols[id].flags.insert(symbol.flags);
-                }
-
-                (id, false)
-            }
-            Entry::Vacant(entry) => {
-                let id = self.table.symbols.push(symbol);
-                entry.insert(id);
-                (id, true)
-            }
-        }
+        insert_entry(
+            &mut self.table.symbols,
+            entry,
+            symbol,
+            |existing, symbol| {
+                existing.flags.insert(symbol.flags);
+            },
+        )
     }
 
     pub(super) fn build(self) -> SymbolTable {

@@ -7,12 +7,40 @@ use crate::predicate::PatternPredicate;
 use crate::scope::FileScopeId;
 use crate::symbol::{ScopedSymbolId, Symbol, SymbolTable, SymbolTableBuilder};
 use crate::{Db, PossiblyNarrowedPlaces};
+use hashbrown::hash_table::Entry;
 use ruff_db::parsed::ParsedModuleRef;
-use ruff_index::IndexVec;
+use ruff_index::{Idx, IndexVec};
 use ruff_python_ast as ast;
+use rustc_hash::FxHasher;
 use smallvec::SmallVec;
-use std::hash::Hash;
+use std::hash::{Hash, Hasher as _};
 use std::iter::FusedIterator;
+
+pub(super) fn hash_key<T: Hash + ?Sized>(value: &T) -> u64 {
+    let mut hasher = FxHasher::default();
+    value.hash(&mut hasher);
+    hasher.finish()
+}
+
+pub(super) fn insert_entry<I: Idx, T>(
+    values: &mut IndexVec<I, T>,
+    entry: Entry<'_, I>,
+    value: T,
+    merge: impl FnOnce(&mut T, T),
+) -> (I, bool) {
+    match entry {
+        Entry::Occupied(entry) => {
+            let id = *entry.get();
+            merge(&mut values[id], value);
+            (id, false)
+        }
+        Entry::Vacant(entry) => {
+            let id = values.push(value);
+            entry.insert(id);
+            (id, true)
+        }
+    }
+}
 
 /// Return the expressions whose existing bindings a match pattern can narrow.
 ///
