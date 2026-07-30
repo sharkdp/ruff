@@ -412,13 +412,6 @@ impl<'db> SemanticIndex<'db> {
         self.scopes_by_expression.try_get(expression)
     }
 
-    /// Returns the [`Scope`] of the `expression`'s enclosing scope.
-    #[allow(unused)]
-    #[track_caller]
-    pub fn expression_scope(&self, expression: &impl HasTrackedScope) -> &Scope {
-        &self.scopes[self.expression_scope_id(expression)]
-    }
-
     /// Returns the [`Scope`] with the given id.
     #[track_caller]
     pub fn scope(&self, id: FileScopeId) -> &Scope {
@@ -1817,14 +1810,16 @@ class C[T]:
         let x_stmt = ast.body[0].as_assign_stmt().unwrap();
         let x = &x_stmt.targets[0];
 
-        assert_eq!(index.expression_scope(x).kind(), ScopeKind::Module);
         assert_eq!(index.expression_scope_id(x), FileScopeId::global());
 
         let def = ast.body[1].as_function_def_stmt().unwrap();
         let y_stmt = def.body[0].as_assign_stmt().unwrap();
         let y = &y_stmt.targets[0];
 
-        assert_eq!(index.expression_scope(y).kind(), ScopeKind::Function);
+        assert_eq!(
+            index.scope(index.expression_scope_id(y)).kind(),
+            ScopeKind::Function
+        );
     }
 
     #[test]
