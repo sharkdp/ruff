@@ -1050,12 +1050,7 @@ impl TypeQualifier {
     }
 
     const fn is_valid_isinstance_target(self) -> bool {
-        match self {
-            Self::InitVar => true,
-            Self::ReadOnly | Self::Final | Self::ClassVar | Self::Required | Self::NotRequired => {
-                false
-            }
-        }
+        self.is_callable()
     }
 
     pub(crate) const fn name(self) -> &'static str {
