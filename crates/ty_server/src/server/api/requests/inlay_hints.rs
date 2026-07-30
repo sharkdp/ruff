@@ -59,8 +59,7 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
                 Some(lsp_types::InlayHint {
                     position: hint
                         .position
-                        .to_lsp_position(db, file, snapshot.encoding())?
-                        .local_position(),
+                        .to_lsp_position(db, file, snapshot.encoding())?,
                     label: inlay_hint_label(&hint.label, db, snapshot.encoding()),
                     kind: Some(inlay_hint_kind(&hint.kind)),
                     tooltip: None,
@@ -128,13 +127,11 @@ fn inlay_hint_text_edit(
             start: inlay_hint_text_edit
                 .range
                 .start()
-                .to_lsp_position(db, file, encoding)?
-                .local_position(),
+                .to_lsp_position(db, file, encoding)?,
             end: inlay_hint_text_edit
                 .range
                 .end()
-                .to_lsp_position(db, file, encoding)?
-                .local_position(),
+                .to_lsp_position(db, file, encoding)?,
         },
         new_text: inlay_hint_text_edit.new_text,
     })

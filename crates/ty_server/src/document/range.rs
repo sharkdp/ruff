@@ -52,34 +52,6 @@ impl LspRange {
     }
 }
 
-/// A position in an LSP text document (cell or a regular document).
-#[derive(Clone, Debug, Default)]
-pub(crate) struct LspPosition {
-    position: lsp_types::Position,
-
-    /// The URI of this range's text document
-    uri: Option<lsp_types::Uri>,
-}
-
-impl LspPosition {
-    /// Returns the position within this document.
-    ///
-    /// Only use [`Self::local_position`] when you already have a URI context and this position is guaranteed
-    /// to be within the same document/cell
-    ///
-    /// Do NOT use this for standalone positions - use [`Self::to_location`] instead to ensure
-    /// the URI and position are consistent.
-    pub(crate) fn local_position(&self) -> lsp_types::Position {
-        self.position
-    }
-
-    /// Returns the uri of the text document this position belongs to.
-    #[expect(unused)]
-    pub(crate) fn uri(&self) -> Option<&lsp_types::Uri> {
-        self.uri.as_ref()
-    }
-}
-
 pub(crate) trait RangeExt {
     /// Convert an LSP Range to a [`TextRange`].
     ///
@@ -178,7 +150,7 @@ pub(crate) trait TextSizeExt {
         db: &dyn Db,
         file: File,
         encoding: PositionEncoding,
-    ) -> Option<LspPosition>
+    ) -> Option<lsp_types::Position>
     where
         Self: Sized;
 }
@@ -189,7 +161,7 @@ impl TextSizeExt for TextSize {
         db: &dyn Db,
         file: File,
         encoding: PositionEncoding,
-    ) -> Option<LspPosition> {
+    ) -> Option<lsp_types::Position> {
         let source = source_text(db, file);
         let index = line_index(db, file);
 
@@ -200,16 +172,11 @@ impl TextSizeExt for TextSize {
 
             let cell_relative_start = notebook.index().translate_source_location(&start);
 
-            return Some(LspPosition {
-                uri: Some(notebook_document.cell_uri_by_index(cell)?.clone()),
-                position: source_location_to_position(&cell_relative_start),
-            });
+            notebook_document.cell_uri_by_index(cell)?;
+            return Some(source_location_to_position(&cell_relative_start));
         }
 
-        let uri = file_to_uri(db, file);
-        let position = text_size_to_lsp_position(*self, &source, &index, encoding);
-
-        Some(LspPosition { position, uri })
+        Some(text_size_to_lsp_position(*self, &source, &index, encoding))
     }
 }
 
