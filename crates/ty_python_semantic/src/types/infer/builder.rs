@@ -7599,24 +7599,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         )
     }
 
-    fn infer_list_comprehension_expression(
+    fn infer_collection_comprehension_expression<const N: usize>(
         &mut self,
-        listcomp: &ast::ExprListComp,
+        collection_class: KnownClass,
+        expression: ast::ExprRef<'_>,
+        scope_node: NodeWithScopeRef<'_>,
+        generators: &[ast::Comprehension],
+        elements: [Option<&ast::Expr>; N],
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let ast::ExprListComp {
-            range: _,
-            node_index: _,
-            elt,
-            generators,
-        } = listcomp;
-
         self.infer_first_comprehension_iter(generators);
 
-        let Some(scope_id) = self
-            .index
-            .try_node_scope(NodeWithScopeRef::ListComprehension(listcomp))
-        else {
+        let Some(scope_id) = self.index.try_node_scope(scope_node) else {
             return Type::unknown();
         };
         let scope = scope_id.to_scope_id(self.db(), self.file());
@@ -7624,13 +7618,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.extend_scope(inference);
 
         self.infer_comprehension_specialization(
-            KnownClass::List,
-            listcomp.into(),
-            [Some(elt)],
+            collection_class,
+            expression,
+            elements,
             inference,
             tcx,
         )
-        .unwrap_or_else(|| KnownClass::List.to_specialized_instance(self.db(), &[Type::unknown()]))
+        .unwrap_or_else(|| {
+            collection_class.to_specialized_instance(self.db(), &[Type::unknown(); N])
+        })
+    }
+
+    fn infer_list_comprehension_expression(
+        &mut self,
+        listcomp: &ast::ExprListComp,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
+        self.infer_collection_comprehension_expression(
+            KnownClass::List,
+            listcomp.into(),
+            NodeWithScopeRef::ListComprehension(listcomp),
+            &listcomp.generators,
+            [Some(listcomp.elt.as_ref())],
+            tcx,
+        )
     }
 
     fn infer_set_comprehension_expression(
@@ -7638,33 +7649,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         setcomp: &ast::ExprSetComp,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let ast::ExprSetComp {
-            range: _,
-            node_index: _,
-            elt,
-            generators,
-        } = setcomp;
-
-        self.infer_first_comprehension_iter(generators);
-
-        let Some(scope_id) = self
-            .index
-            .try_node_scope(NodeWithScopeRef::SetComprehension(setcomp))
-        else {
-            return Type::unknown();
-        };
-        let scope = scope_id.to_scope_id(self.db(), self.file());
-        let inference = infer_scope_types(self.db(), scope, tcx);
-        self.extend_scope(inference);
-
-        self.infer_comprehension_specialization(
+        self.infer_collection_comprehension_expression(
             KnownClass::Set,
             setcomp.into(),
-            [Some(elt)],
-            inference,
+            NodeWithScopeRef::SetComprehension(setcomp),
+            &setcomp.generators,
+            [Some(setcomp.elt.as_ref())],
             tcx,
         )
-        .unwrap_or_else(|| KnownClass::Set.to_specialized_instance(self.db(), &[Type::unknown()]))
     }
 
     fn infer_dict_comprehension_expression(
@@ -7672,36 +7664,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         dictcomp: &ast::ExprDictComp,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let ast::ExprDictComp {
-            range: _,
-            node_index: _,
-            key,
-            value,
-            generators,
-        } = dictcomp;
-
-        self.infer_first_comprehension_iter(generators);
-
-        let Some(scope_id) = self
-            .index
-            .try_node_scope(NodeWithScopeRef::DictComprehension(dictcomp))
-        else {
-            return Type::unknown();
-        };
-        let scope = scope_id.to_scope_id(self.db(), self.file());
-        let inference = infer_scope_types(self.db(), scope, tcx);
-        self.extend_scope(inference);
-
-        self.infer_comprehension_specialization(
+        self.infer_collection_comprehension_expression(
             KnownClass::Dict,
             dictcomp.into(),
-            [key.as_deref(), Some(value)],
-            inference,
+            NodeWithScopeRef::DictComprehension(dictcomp),
+            &dictcomp.generators,
+            [dictcomp.key.as_deref(), Some(dictcomp.value.as_ref())],
             tcx,
         )
-        .unwrap_or_else(|| {
-            KnownClass::Dict.to_specialized_instance(self.db(), &[Type::unknown(), Type::unknown()])
-        })
     }
 
     fn infer_generator_expression_scope(
