@@ -1792,67 +1792,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self,
         nested_bindings: NestedGlobalOrNonlocalDeclarations,
     ) {
-        let mut nested_bindings = nested_bindings.into_iter().collect::<Vec<_>>();
-        nested_bindings.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
-
-        for (name, mut declarations) in nested_bindings {
-            // Filter down to only the declarations with `is_bound: true`. If there are none left,
-            // skip synthesizing a definition for this symbol. (The reason we track these at all is
-            // that we reuse some of the same machinery to report semantic syntax errors for
-            // invalid `nonlocal`s, and those don't necessarily need a binding.)
-            declarations.retain(|d| d.is_bound);
-            declarations.shrink_to_fit();
-            if declarations.is_empty() {
-                continue;
-            }
-
-            let place: ScopedPlaceId = self.add_symbol(name.clone()).into();
-            let definition = Definition::new(
-                self.db,
-                self.current_scope_id(),
-                place,
-                DefinitionKind::NestedBindings(Box::new(NestedBindingsDefinitionKind {
-                    name,
-                    execution: NestedBindingExecution::Lazy,
-                    nested_declarations: declarations,
-                })),
-                false,
-            );
-
-            // Adding a binding typically invalidates narrowing aliases like
-            // `is_int = isinstance(x, int)`. However, for the same reason that we retain both
-            // `global` and `nonlocal` nested writes -- we don't necessarily know yet which ones
-            // are going to be visible in the current scope -- it's also too early to know whether
-            // we should invalidate narrowing aliases. Situations where this matters tend to be
-            // *very* contrived, though, for example:
-            //
-            // ```py
-            // x: int | str = 1
-            // def _(x: int | str):
-            //     is_int = isinstance(x, int)
-            //     def _():
-            //         global x
-            //         x = "hello"
-            //     if is_int:
-            //         # We should narrow `x` to `int` here, because the global `x` is a different variable.
-            //         reveal_type(x)
-            // ```
-            //
-            // TODO: We could be more precise here by delaying invalidation until inference time.
-            self.invalidate_narrowing_aliases_for(place);
-
-            self.current_use_def_map_mut().record_binding(
-                place,
-                definition,
-                // Nested bindings definitions are like loop headers in that they don't shadow
-                // prior bindings, but they're different in that they *also* don't get shadowed by
-                // bindings that come later. The idea is that nested functions can be called at any
-                // time, so these bindings are effectively always visible after their function
-                // definitions.
-                PreviousDefinitions::AreKept,
-                FutureDefinitions::DontShadowThisOne,
-            );
-        }
+        self.synthesize_binding_definitions(nested_bindings, NestedBindingExecution::Lazy);
     }
 
     /// Records assignment-expression bindings from a comprehension in its containing scope.
@@ -1869,6 +1809,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self,
         nested_bindings: NestedGlobalOrNonlocalDeclarations,
     ) {
+        self.synthesize_binding_definitions(nested_bindings, NestedBindingExecution::Eager);
+    }
+
+    fn synthesize_binding_definitions(
+        &mut self,
+        nested_bindings: NestedGlobalOrNonlocalDeclarations,
+        execution: NestedBindingExecution,
+    ) {
         let mut nested_bindings = nested_bindings.into_iter().collect::<Vec<_>>();
         nested_bindings.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
 
@@ -1880,21 +1828,31 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 continue;
             };
 
-            let binding_status = self.comprehension_binding_status(&name, &declarations);
+            let binding_status = matches!(execution, NestedBindingExecution::Eager)
+                .then(|| self.comprehension_binding_status(&name, &declarations));
 
             let symbol = self.add_symbol(name.clone());
-            debug_assert!(
-                declarations
-                    .iter()
-                    .all(|declaration| declaration.is_global() == first_declaration.is_global())
-            );
-            self.forward_comprehension_binding(&name, first_declaration, symbol);
-
             let place: ScopedPlaceId = symbol.into();
-            if binding_status == LiveBindingStatus::Unbound {
-                self.mark_place_bound(place);
-                continue;
-            }
+
+            let previous = if let Some(binding_status) = binding_status {
+                debug_assert!(declarations.iter().all(
+                        |declaration| declaration.is_global() == first_declaration.is_global()
+                    ));
+                self.forward_comprehension_binding(&name, first_declaration, symbol);
+
+                if binding_status == LiveBindingStatus::Unbound {
+                    self.mark_place_bound(place);
+                    continue;
+                }
+
+                Some(if binding_status == LiveBindingStatus::Bound {
+                    PreviousDefinitions::AreShadowed
+                } else {
+                    PreviousDefinitions::AreKept
+                })
+            } else {
+                None
+            };
 
             let definition = Definition::new(
                 self.db,
@@ -1902,17 +1860,49 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 place,
                 DefinitionKind::NestedBindings(Box::new(NestedBindingsDefinitionKind {
                     name,
-                    execution: NestedBindingExecution::Eager,
+                    execution,
                     nested_declarations: declarations,
                 })),
                 false,
             );
-            let previous = if binding_status == LiveBindingStatus::Bound {
-                PreviousDefinitions::AreShadowed
+
+            if let Some(previous) = previous {
+                self.record_definition(place, definition, Some(previous));
             } else {
-                PreviousDefinitions::AreKept
-            };
-            self.record_definition(place, definition, Some(previous));
+                // Adding a binding typically invalidates narrowing aliases like
+                // `is_int = isinstance(x, int)`. However, for the same reason that we retain both
+                // `global` and `nonlocal` nested writes -- we don't necessarily know yet which ones
+                // are going to be visible in the current scope -- it's also too early to know whether
+                // we should invalidate narrowing aliases. Situations where this matters tend to be
+                // *very* contrived, though, for example:
+                //
+                // ```py
+                // x: int | str = 1
+                // def _(x: int | str):
+                //     is_int = isinstance(x, int)
+                //     def _():
+                //         global x
+                //         x = "hello"
+                //     if is_int:
+                //         # We should narrow `x` to `int` here, because the global `x` is a different variable.
+                //         reveal_type(x)
+                // ```
+                //
+                // TODO: We could be more precise here by delaying invalidation until inference time.
+                self.invalidate_narrowing_aliases_for(place);
+
+                self.current_use_def_map_mut().record_binding(
+                    place,
+                    definition,
+                    // Nested bindings definitions are like loop headers in that they don't shadow
+                    // prior bindings, but they're different in that they *also* don't get shadowed by
+                    // bindings that come later. The idea is that nested functions can be called at any
+                    // time, so these bindings are effectively always visible after their function
+                    // definitions.
+                    PreviousDefinitions::AreKept,
+                    FutureDefinitions::DontShadowThisOne,
+                );
+            }
         }
     }
 
