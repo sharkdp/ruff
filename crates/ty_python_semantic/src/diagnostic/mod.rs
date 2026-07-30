@@ -2,7 +2,7 @@ use crate::{
     Db, Program, PythonVersionSource, PythonVersionWithSource, lint::lint_documentation_url,
     types::TypeCheckDiagnostics,
 };
-use levenshtein::{HideUnderscoredSuggestions, find_best_suggestion};
+use levenshtein::find_best_suggestion;
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, DiagnosticId, SubDiagnostic, SubDiagnosticSeverity},
     files::File,
@@ -18,7 +18,7 @@ where
     O: IntoIterator<IntoIter = I>,
     I: ExactSizeIterator<Item = &'a str>,
 {
-    find_best_suggestion(options, typo, HideUnderscoredSuggestions::Yes)
+    find_best_suggestion(options, typo)
 }
 
 /// Return an annotation for the source from which ty inferred the Python version, when one exists.

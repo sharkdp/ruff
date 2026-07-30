@@ -8,27 +8,7 @@
 
 use std::collections::BTreeSet;
 
-/// Whether to hide suggestions that start with an underscore.
-///
-/// If the typo itself starts with an underscore, this policy is ignored.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum HideUnderscoredSuggestions {
-    Yes,
-    #[cfg_attr(not(test), expect(dead_code))]
-    No,
-}
-
-impl HideUnderscoredSuggestions {
-    const fn is_no(self) -> bool {
-        matches!(self, HideUnderscoredSuggestions::No)
-    }
-}
-
-pub(super) fn find_best_suggestion<'a, O, I>(
-    options: O,
-    typo: &str,
-    hide_underscored_suggestions: HideUnderscoredSuggestions,
-) -> Option<&'a str>
+pub(super) fn find_best_suggestion<'a, O, I>(options: O, typo: &str) -> Option<&'a str>
 where
     O: IntoIterator<IntoIter = I>,
     I: ExactSizeIterator<Item = &'a str>,
@@ -49,12 +29,9 @@ where
     // so we never suggest the exact same name as the one that failed to resolve.
     let options = options.filter(|name| *name != typo);
 
-    let options: BTreeSet<&'a str> =
-        if hide_underscored_suggestions.is_no() || typo.starts_with('_') {
-            options.collect()
-        } else {
-            options.filter(|name| !name.starts_with('_')).collect()
-        };
+    let options: BTreeSet<&'a str> = options
+        .filter(|name| typo.starts_with('_') || !name.starts_with('_'))
+        .collect();
     find_best_suggestion_impl(options, typo)
 }
 
@@ -228,18 +205,17 @@ mod tests {
     #[test_case(["blucha", "bluc"], "bluc"; "eliminations are preferred over additions")]
     #[test_case(["Luch", "fluch", "BLuch"], "BLuch"; "case changes are preferred over substitutions")]
     fn test_good_suggestions<const T: usize>(candidate_list: [&str; T], expected_suggestion: &str) {
-        let suggestion =
-            find_best_suggestion(candidate_list, "bluch", HideUnderscoredSuggestions::No);
+        let suggestion = find_best_suggestion(candidate_list, "bluch");
         assert_eq!(suggestion, Some(expected_suggestion));
     }
 
     /// Test ported from <https://github.com/python/cpython/blob/6eb6c5dbfb528bd07d77b60fd71fd05d81d45c41/Lib/test/test_traceback.py#L4080-L4099>
     #[test]
     fn underscored_names_not_suggested_if_hide_policy_set_to_yes() {
-        let suggestion = find_best_suggestion(["bluch"], "bluch", HideUnderscoredSuggestions::Yes);
+        let suggestion = find_best_suggestion(["_bluch"], "bluch");
         if let Some(suggestion) = suggestion {
             panic!(
-                "Expected no suggestions for `bluch` due to `HideUnderscoredSuggestions::Yes` but `{suggestion}` was suggested"
+                "Expected no underscored suggestions for `bluch` but `{suggestion}` was suggested"
             );
         }
     }
@@ -250,7 +226,7 @@ mod tests {
     fn underscored_names_are_suggested_if_hide_policy_set_to_yes_when_typo_is_underscored(
         typo: &str,
     ) {
-        let suggestion = find_best_suggestion(["_bluch"], typo, HideUnderscoredSuggestions::Yes);
+        let suggestion = find_best_suggestion(["_bluch"], typo);
         assert_eq!(suggestion, Some("_bluch"));
     }
 
@@ -258,7 +234,7 @@ mod tests {
     #[test_case("_luch")]
     #[test_case("_bluch")]
     fn non_underscored_names_always_suggested_even_if_typo_underscored(typo: &str) {
-        let suggestion = find_best_suggestion(["bluch"], typo, HideUnderscoredSuggestions::Yes);
+        let suggestion = find_best_suggestion(["bluch"], typo);
         assert_eq!(suggestion, Some("bluch"));
     }
 
@@ -270,7 +246,7 @@ mod tests {
     #[test_case("py")]
     fn test_bad_suggestions_do_not_trigger_for_small_names(typo: &str) {
         let candidates = ["vvv", "mom", "w", "id", "pytho"];
-        let suggestion = find_best_suggestion(candidates, typo, HideUnderscoredSuggestions::No);
+        let suggestion = find_best_suggestion(candidates, typo);
         if let Some(suggestion) = suggestion {
             panic!("Expected no suggestions for `{typo}` but `{suggestion}` was suggested");
         }
@@ -279,14 +255,7 @@ mod tests {
     /// Test ported from <https://github.com/python/cpython/blob/6eb6c5dbfb528bd07d77b60fd71fd05d81d45c41/Lib/test/test_traceback.py#L4101-L4106>
     #[test]
     fn test_no_suggestion_for_very_different_name() {
-        assert_eq!(
-            find_best_suggestion(
-                ["blech"],
-                "somethingverywrong",
-                HideUnderscoredSuggestions::No
-            ),
-            None
-        );
+        assert_eq!(find_best_suggestion(["blech"], "somethingverywrong"), None);
     }
 
     /// These tests are from the Levenshtein Wikipedia article, updated to match CPython's
