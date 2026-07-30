@@ -37,9 +37,9 @@ fn section_item(kind: SectionKind, fragment: google::BodyFragment) -> SectionIte
 
 #[cfg(test)]
 mod tests {
-    use insta::{Settings, assert_snapshot};
+    use insta::assert_snapshot;
 
-    use super::super::render_sections_into;
+    use super::super::{bind_markdown_snapshot_filters, render_sections_into};
     use super::structured_sections;
 
     #[test]
@@ -334,11 +334,5 @@ After.
 
     fn parsed_sections(normalized_source: &str) -> Vec<super::Section> {
         structured_sections(normalized_source)
-    }
-
-    fn bind_markdown_snapshot_filters() -> impl Drop {
-        let mut settings = Settings::clone_current();
-        settings.add_filter("  \n", "<HB>\n");
-        settings.bind_to_scope()
     }
 }

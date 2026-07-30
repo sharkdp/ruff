@@ -458,11 +458,20 @@ fn render_code_span_into(output: &mut String, text: &str) {
 }
 
 #[cfg(test)]
+fn bind_markdown_snapshot_filters() -> impl Drop {
+    let mut settings = insta::Settings::clone_current();
+    settings.add_filter("  \n", "<HB>\n");
+    settings.bind_to_scope()
+}
+
+#[cfg(test)]
 mod tests {
-    use insta::{Settings, assert_snapshot};
+    use insta::assert_snapshot;
     use ruff_text_size::{TextRange, TextSize};
 
-    use super::{Section, SectionItem, SectionKind, render_sections_into};
+    use super::{
+        Section, SectionItem, SectionKind, bind_markdown_snapshot_filters, render_sections_into,
+    };
 
     #[test]
     fn sections_render_in_canonical_order() {
@@ -905,11 +914,5 @@ Rendered as code:
         let mut output = String::new();
         render_sections_into(&mut output, raw, sections);
         output
-    }
-
-    fn bind_markdown_snapshot_filters() -> impl Drop {
-        let mut settings = Settings::clone_current();
-        settings.add_filter("  \n", "<HB>\n");
-        settings.bind_to_scope()
     }
 }

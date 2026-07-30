@@ -41,9 +41,9 @@ fn section_item(kind: SectionKind, fragment: numpy::BodyFragment) -> SectionItem
 
 #[cfg(test)]
 mod tests {
-    use insta::{Settings, assert_snapshot};
+    use insta::assert_snapshot;
 
-    use super::super::render_sections_into;
+    use super::super::{bind_markdown_snapshot_filters, render_sections_into};
     use super::structured_sections;
 
     #[test]
@@ -360,11 +360,5 @@ Not a return value.
 
     fn parsed_sections(source: &str) -> Vec<super::Section> {
         structured_sections(source)
-    }
-
-    fn bind_markdown_snapshot_filters() -> impl Drop {
-        let mut settings = Settings::clone_current();
-        settings.add_filter("  \n", "<HB>\n");
-        settings.bind_to_scope()
     }
 }

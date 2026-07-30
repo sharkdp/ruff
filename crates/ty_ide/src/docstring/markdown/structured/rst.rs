@@ -234,9 +234,9 @@ impl<'a> SupplementalTypeFields<'a> {
 
 #[cfg(test)]
 mod tests {
-    use insta::{Settings, assert_snapshot};
+    use insta::assert_snapshot;
 
-    use super::super::render_into;
+    use super::super::{bind_markdown_snapshot_filters, render_into};
 
     #[test]
     fn render_parameters_with_inline_and_supplemental_types() {
@@ -841,11 +841,5 @@ Summary.
         let mut output = String::new();
         crate::docstring::markdown::general::render_into(&mut output, raw);
         output
-    }
-
-    fn bind_markdown_snapshot_filters() -> impl Drop {
-        let mut settings = Settings::clone_current();
-        settings.add_filter("  \n", "<HB>\n");
-        settings.bind_to_scope()
     }
 }
