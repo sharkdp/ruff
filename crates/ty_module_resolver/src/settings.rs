@@ -9,7 +9,7 @@ use crate::strategy::MisconfigurationStrategy;
 use crate::typeshed::TypeshedVersionsParseError;
 
 /// Configures the search paths for module resolution.
-#[derive(Eq, PartialEq, Debug, Clone)]
+#[derive(Eq, PartialEq, Debug, Clone, Default)]
 pub struct SearchPathSettings {
     /// List of user-provided paths that should take first priority in the module resolution.
     /// Examples in other type checkers are mypy's MYPYPATH environment variable,
@@ -43,13 +43,7 @@ impl SearchPathSettings {
     }
 
     pub fn empty() -> Self {
-        SearchPathSettings {
-            src_roots: vec![],
-            extra_paths: vec![],
-            custom_typeshed: None,
-            site_packages_paths: vec![],
-            real_stdlib_path: None,
-        }
+        Self::default()
     }
 
     pub fn to_search_paths<Strategy: MisconfigurationStrategy>(
