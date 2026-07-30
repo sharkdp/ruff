@@ -153,6 +153,37 @@ impl<T> TestCaseBuilder<T> {
         .unwrap();
         root
     }
+
+    fn configure_search_paths(
+        mut db: TestDb,
+        src: &SystemPath,
+        site_packages: &SystemPath,
+        custom_typeshed: Option<SystemPathBuf>,
+        roots: &[SystemPathBuf],
+    ) -> TestDb {
+        let stdlib = custom_typeshed
+            .as_ref()
+            .map(|typeshed| typeshed.join("stdlib"));
+        let search_paths = SearchPathSettings {
+            src_roots: vec![src.to_path_buf()],
+            custom_typeshed,
+            site_packages_paths: vec![site_packages.to_path_buf()],
+            ..SearchPathSettings::empty()
+        }
+        .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
+        .expect("Valid search path settings");
+
+        db = db.with_search_paths(search_paths);
+        db.files().try_add_root(&db, src, FileRootKind::Project);
+        if let Some(stdlib) = stdlib {
+            db.files()
+                .try_add_root(&db, &stdlib, FileRootKind::SearchPath);
+        }
+        for root in roots {
+            db.files().try_add_root(&db, root, FileRootKind::SearchPath);
+        }
+        db
+    }
 }
 
 impl TestCaseBuilder<UnspecifiedTypeshed> {
@@ -243,29 +274,7 @@ impl TestCaseBuilder<MockedTypeshed> {
         let typeshed = Self::build_typeshed_mock(&mut db, &typeshed_option);
         let stdlib = typeshed.join("stdlib");
 
-        let search_paths = SearchPathSettings {
-            src_roots: vec![src.clone()],
-            custom_typeshed: Some(typeshed),
-            site_packages_paths: vec![site_packages.clone()],
-            ..SearchPathSettings::empty()
-        }
-        .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
-        .expect("Valid search path settings");
-
-        db = db.with_search_paths(search_paths);
-
-        // Roots for other search paths are added as part of
-        // search path initialization in `SearchPaths::from_settings`,
-        // and any remaining are added below.
-        db.files()
-            .try_add_root(&db, SystemPath::new("/src"), FileRootKind::Project);
-
-        db.files()
-            .try_add_root(&db, &stdlib, FileRootKind::SearchPath);
-
-        for root in &roots {
-            db.files().try_add_root(&db, root, FileRootKind::SearchPath);
-        }
+        db = Self::configure_search_paths(db, &src, &site_packages, Some(typeshed), &roots);
 
         TestCase {
             db,
@@ -310,21 +319,7 @@ impl TestCaseBuilder<VendoredTypeshed> {
             Self::write_mock_directory(&mut db, "/site-packages", site_packages_files);
         let src = Self::write_mock_directory(&mut db, "/src", first_party_files);
 
-        let search_paths = SearchPathSettings {
-            src_roots: vec![src.clone()],
-            site_packages_paths: vec![site_packages.clone()],
-            ..SearchPathSettings::empty()
-        }
-        .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
-        .expect("Valid search path settings");
-
-        db = db.with_search_paths(search_paths);
-
-        db.files()
-            .try_add_root(&db, SystemPath::new("/src"), FileRootKind::Project);
-        for root in &roots {
-            db.files().try_add_root(&db, root, FileRootKind::SearchPath);
-        }
+        db = Self::configure_search_paths(db, &src, &site_packages, None, &roots);
 
         TestCase {
             db,
