@@ -127,35 +127,31 @@ impl Symbol {
     }
 
     pub(super) fn mark_global(&mut self) {
-        self.insert_flags(SymbolFlags::MARKED_GLOBAL);
+        self.flags.insert(SymbolFlags::MARKED_GLOBAL);
     }
 
     pub(super) fn mark_nonlocal(&mut self) {
-        self.insert_flags(SymbolFlags::MARKED_NONLOCAL);
+        self.flags.insert(SymbolFlags::MARKED_NONLOCAL);
     }
 
     pub(super) fn mark_bound(&mut self) {
         if self.is_bound() || self.is_used() {
-            self.insert_flags(SymbolFlags::IS_REASSIGNED);
+            self.flags.insert(SymbolFlags::IS_REASSIGNED);
         }
 
-        self.insert_flags(SymbolFlags::IS_BOUND);
+        self.flags.insert(SymbolFlags::IS_BOUND);
     }
 
     pub(super) fn mark_used(&mut self) {
-        self.insert_flags(SymbolFlags::IS_USED);
+        self.flags.insert(SymbolFlags::IS_USED);
     }
 
     pub(super) fn mark_declared(&mut self) {
-        self.insert_flags(SymbolFlags::IS_DECLARED);
+        self.flags.insert(SymbolFlags::IS_DECLARED);
     }
 
     pub(super) fn mark_parameter(&mut self) {
-        self.insert_flags(SymbolFlags::IS_PARAMETER);
-    }
-
-    fn insert_flags(&mut self, flags: SymbolFlags) {
-        self.flags.insert(flags);
+        self.flags.insert(SymbolFlags::IS_PARAMETER);
     }
 }
 

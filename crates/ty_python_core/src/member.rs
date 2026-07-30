@@ -46,11 +46,11 @@ impl Member {
     }
 
     pub(super) fn mark_bound(&mut self) {
-        self.insert_flags(MemberFlags::IS_BOUND);
+        self.flags.insert(MemberFlags::IS_BOUND);
     }
 
     pub(super) fn mark_declared(&mut self) {
-        self.insert_flags(MemberFlags::IS_DECLARED);
+        self.flags.insert(MemberFlags::IS_DECLARED);
     }
 
     pub(super) fn mark_instance_attribute(&mut self) {
@@ -64,10 +64,6 @@ impl Member {
             debug_assert!(self.is_instance_attribute_candidate());
         }
         is_instance_attribute
-    }
-
-    fn insert_flags(&mut self, flags: MemberFlags) {
-        self.flags.insert(flags);
     }
 
     /// If the place expression has the form `<NAME>.<MEMBER>`
