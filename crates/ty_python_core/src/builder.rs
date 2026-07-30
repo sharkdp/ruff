@@ -2611,7 +2611,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         scope: NodeWithScopeRef,
         generators: &'ast [ast::Comprehension],
         visit_outer_elt: impl FnOnce(&mut Self),
-    ) -> FileScopeId {
+    ) {
         let mut generators_iter = generators.iter();
 
         let Some(generator) = generators_iter.next() else {
@@ -2677,7 +2677,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         self.current_assignments = saved_assignments;
 
-        comprehension_scope
+        if !matches!(scope, NodeWithScopeRef::GeneratorExpression(_))
+            && self.async_comprehensions.contains(&comprehension_scope)
+        {
+            self.mark_current_comprehension_async();
+        }
     }
 
     /// Visits a comprehension filter on its truthy path and returns the filtered-out path.
@@ -4754,28 +4758,22 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     elt, generators, ..
                 },
             ) => {
-                let scope = self.with_generators_scope(
+                self.with_generators_scope(
                     NodeWithScopeRef::ListComprehension(list_comprehension),
                     generators,
                     |builder| builder.visit_expr(elt),
                 );
-                if self.async_comprehensions.contains(&scope) {
-                    self.mark_current_comprehension_async();
-                }
             }
             ast::Expr::SetComp(
                 set_comprehension @ ast::ExprSetComp {
                     elt, generators, ..
                 },
             ) => {
-                let scope = self.with_generators_scope(
+                self.with_generators_scope(
                     NodeWithScopeRef::SetComprehension(set_comprehension),
                     generators,
                     |builder| builder.visit_expr(elt),
                 );
-                if self.async_comprehensions.contains(&scope) {
-                    self.mark_current_comprehension_async();
-                }
             }
             ast::Expr::Generator(
                 generator @ ast::ExprGenerator {
@@ -4796,7 +4794,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     ..
                 },
             ) => {
-                let scope = self.with_generators_scope(
+                self.with_generators_scope(
                     NodeWithScopeRef::DictComprehension(dict_comprehension),
                     generators,
                     |builder| {
@@ -4806,9 +4804,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         builder.visit_expr(value);
                     },
                 );
-                if self.async_comprehensions.contains(&scope) {
-                    self.mark_current_comprehension_async();
-                }
             }
             ast::Expr::BoolOp(ast::ExprBoolOp {
                 values,
