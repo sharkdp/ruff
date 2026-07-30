@@ -1762,23 +1762,6 @@ impl DocumentHandle {
         }
     }
 
-    #[expect(unused)]
-    pub(crate) fn file_path(&self) -> Option<&AnySystemPath> {
-        match self {
-            Self::Text { path, .. } | Self::Notebook { path, .. } => Some(path),
-            Self::Cell { .. } => None,
-        }
-    }
-
-    #[expect(unused)]
-    pub(crate) fn notebook_path(&self) -> Option<&AnySystemPath> {
-        match self {
-            DocumentHandle::Notebook { path, .. } => Some(path),
-            DocumentHandle::Cell { notebook_path, .. } => Some(notebook_path),
-            DocumentHandle::Text { .. } => None,
-        }
-    }
-
     /// Returns the salsa interned [`File`] for the document selected by this query.
     ///
     /// It returns [`None`] for the following cases:
