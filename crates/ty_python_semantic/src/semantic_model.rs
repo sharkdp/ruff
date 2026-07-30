@@ -751,41 +751,7 @@ impl_expression_has_type!(ast::ExprIpyEscapeCommand);
 
 impl HasType for ast::Expr {
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
-        match self {
-            Expr::BoolOp(inner) => inner.inferred_type(model),
-            Expr::Named(inner) => inner.inferred_type(model),
-            Expr::BinOp(inner) => inner.inferred_type(model),
-            Expr::UnaryOp(inner) => inner.inferred_type(model),
-            Expr::Lambda(inner) => inner.inferred_type(model),
-            Expr::If(inner) => inner.inferred_type(model),
-            Expr::Dict(inner) => inner.inferred_type(model),
-            Expr::Set(inner) => inner.inferred_type(model),
-            Expr::ListComp(inner) => inner.inferred_type(model),
-            Expr::SetComp(inner) => inner.inferred_type(model),
-            Expr::DictComp(inner) => inner.inferred_type(model),
-            Expr::Generator(inner) => inner.inferred_type(model),
-            Expr::Await(inner) => inner.inferred_type(model),
-            Expr::Yield(inner) => inner.inferred_type(model),
-            Expr::YieldFrom(inner) => inner.inferred_type(model),
-            Expr::Compare(inner) => inner.inferred_type(model),
-            Expr::Call(inner) => inner.inferred_type(model),
-            Expr::FString(inner) => inner.inferred_type(model),
-            Expr::TString(inner) => inner.inferred_type(model),
-            Expr::StringLiteral(inner) => inner.inferred_type(model),
-            Expr::BytesLiteral(inner) => inner.inferred_type(model),
-            Expr::NumberLiteral(inner) => inner.inferred_type(model),
-            Expr::BooleanLiteral(inner) => inner.inferred_type(model),
-            Expr::NoneLiteral(inner) => inner.inferred_type(model),
-            Expr::EllipsisLiteral(inner) => inner.inferred_type(model),
-            Expr::Attribute(inner) => inner.inferred_type(model),
-            Expr::Subscript(inner) => inner.inferred_type(model),
-            Expr::Starred(inner) => inner.inferred_type(model),
-            Expr::Name(inner) => inner.inferred_type(model),
-            Expr::List(inner) => inner.inferred_type(model),
-            Expr::Tuple(inner) => inner.inferred_type(model),
-            Expr::Slice(inner) => inner.inferred_type(model),
-            Expr::IpyEscapeCommand(inner) => inner.inferred_type(model),
-        }
+        ExprRef::from(self).inferred_type(model)
     }
 }
 
