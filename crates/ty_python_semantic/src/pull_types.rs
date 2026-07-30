@@ -75,26 +75,7 @@ impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
                 self.visit_body(&with_stmt.body);
                 return;
             }
-            ast::Stmt::AnnAssign(_)
-            | ast::Stmt::Return(_)
-            | ast::Stmt::Delete(_)
-            | ast::Stmt::AugAssign(_)
-            | ast::Stmt::TypeAlias(_)
-            | ast::Stmt::While(_)
-            | ast::Stmt::If(_)
-            | ast::Stmt::Match(_)
-            | ast::Stmt::Raise(_)
-            | ast::Stmt::Try(_)
-            | ast::Stmt::Assert(_)
-            | ast::Stmt::Import(_)
-            | ast::Stmt::ImportFrom(_)
-            | ast::Stmt::Global(_)
-            | ast::Stmt::Nonlocal(_)
-            | ast::Stmt::Expr(_)
-            | ast::Stmt::Pass(_)
-            | ast::Stmt::Break(_)
-            | ast::Stmt::Continue(_)
-            | ast::Stmt::IpyEscapeCommand(_) => {}
+            _ => {}
         }
 
         source_order::walk_stmt(self, stmt);
