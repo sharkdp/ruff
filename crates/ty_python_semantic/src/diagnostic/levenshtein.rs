@@ -65,10 +65,10 @@ fn find_best_suggestion_impl<'a>(options: BTreeSet<&'a str>, typo: &str) -> Opti
         let mut max_distance =
             (candidate.chars().count() + typo.chars().count() + 3) * MOVE_COST / 6;
 
-        if let Some((_, best_distance)) = best_suggestion {
-            if best_distance > 0 {
-                max_distance = max_distance.min(best_distance - 1);
-            }
+        if let Some((_, best_distance)) = best_suggestion
+            && best_distance > 0
+        {
+            max_distance = max_distance.min(best_distance - 1);
         }
 
         let current_distance = levenshtein_distance(typo, candidate, max_distance);
@@ -93,12 +93,7 @@ fn substitution_cost(char_a: char, char_b: char) -> CharacterMatch {
         return CharacterMatch::Exact;
     }
 
-    let char_a_lowercase = char_a.to_lowercase();
-    let char_b_lowercase = char_b.to_lowercase();
-
-    if char_a_lowercase.len() == char_b_lowercase.len()
-        && char_a_lowercase.zip(char_b_lowercase).all(|(a, b)| a == b)
-    {
+    if char_a.to_lowercase().eq(char_b.to_lowercase()) {
         return CharacterMatch::CaseInsensitive;
     }
 
@@ -152,42 +147,29 @@ fn levenshtein_distance(string_a: &str, string_b: &str, max_cost: usize) -> usiz
     let mut string_a_chars = &string_a_chars[..string_a_chars.len() - post];
     let mut string_b_chars = &string_b_chars[..string_b_chars.len() - post];
 
-    let mut string_a_len = string_a_chars.len();
-    let mut string_b_len = string_b_chars.len();
-
     // Short-circuit if either string is empty after trimming affixes/suffixes
-    if string_a_len == 0 || string_b_len == 0 {
-        return MOVE_COST * (string_a_len + string_b_len);
+    if string_a_chars.is_empty() || string_b_chars.is_empty() {
+        return MOVE_COST * (string_a_chars.len() + string_b_chars.len());
     }
 
     // `string_a` should refer to the shorter of the two strings.
     // This enables us to create a smaller buffer in the main loop below.
     if string_b_chars.len() < string_a_chars.len() {
         std::mem::swap(&mut string_a_chars, &mut string_b_chars);
-        std::mem::swap(&mut string_a_len, &mut string_b_len);
     }
+    let string_a_len = string_a_chars.len();
+    let string_b_len = string_b_chars.len();
 
     // Quick fail if a match is impossible.
     if (string_b_len - string_a_len) * MOVE_COST > max_cost {
         return max_cost + 1;
     }
 
-    let mut row = vec![0; string_a_len];
-    for (i, v) in (MOVE_COST..MOVE_COST * (string_a_len + 1))
-        .step_by(MOVE_COST)
-        .enumerate()
-    {
-        row[i] = v;
-    }
+    let mut row: Vec<_> = (1..=string_a_len).map(|index| index * MOVE_COST).collect();
 
     let mut result = 0;
 
-    for (b_index, b_char) in string_b_chars
-        .iter()
-        .copied()
-        .enumerate()
-        .take(string_b_len)
-    {
+    for (b_index, b_char) in string_b_chars.iter().copied().enumerate() {
         result = b_index * MOVE_COST;
         let mut distance = result;
         let mut minimum = usize::MAX;
@@ -198,9 +180,7 @@ fn levenshtein_distance(string_a: &str, string_b: &str, max_cost: usize) -> usiz
             result = insert_delete.min(substitute);
 
             row[index] = result;
-            if result < minimum {
-                minimum = result;
-            }
+            minimum = minimum.min(result);
         }
 
         if minimum > max_cost {
