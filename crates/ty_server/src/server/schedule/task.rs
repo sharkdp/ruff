@@ -37,7 +37,7 @@ pub(in crate::server) enum BackgroundSchedule {
 #[must_use]
 pub(in crate::server) enum Task {
     Background(BackgroundTaskBuilder),
-    Sync(SyncTask),
+    Sync(LocalFn),
 }
 
 // The reason why this isn't just a 'static background closure
@@ -51,10 +51,6 @@ pub(in crate::server) enum Task {
 pub(in crate::server) struct BackgroundTaskBuilder {
     pub(super) schedule: BackgroundSchedule,
     pub(super) builder: BackgroundFnBuilder,
-}
-
-pub(in crate::server) struct SyncTask {
-    pub(super) func: LocalFn,
 }
 
 impl Task {
@@ -73,9 +69,7 @@ impl Task {
     where
         F: FnOnce(&mut Session, &Client) + 'static,
     {
-        Self::Sync(SyncTask {
-            func: Box::new(func),
-        })
+        Self::Sync(Box::new(func))
     }
     /// Creates a local task that immediately
     /// responds with the provided `request`.

@@ -7,10 +7,7 @@ mod thread;
 
 use ruff_db::STACK_SIZE;
 
-use self::{
-    task::{BackgroundTaskBuilder, SyncTask},
-    thread::ThreadPriority,
-};
+use self::{task::BackgroundTaskBuilder, thread::ThreadPriority};
 use crate::session::client::Client;
 pub(super) use task::{BackgroundSchedule, Task};
 
@@ -48,7 +45,7 @@ impl Scheduler {
     /// executing it on a background thread pool.
     pub(super) fn dispatch(&mut self, task: task::Task, session: &mut Session, client: Client) {
         match task {
-            Task::Sync(SyncTask { func }) => {
+            Task::Sync(func) => {
                 func(session, &client);
             }
             Task::Background(BackgroundTaskBuilder {
