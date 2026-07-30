@@ -2714,41 +2714,20 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn declare_parameters(&mut self, parameters: &'ast ast::Parameters) {
         for parameter in parameters.iter_non_variadic_params() {
-            self.declare_parameter(parameter);
+            self.declare_parameter(ParameterDefinitionNodeRef::Parameter(parameter), None);
         }
         if let Some(vararg) = parameters.vararg.as_ref() {
-            let symbol = self.add_symbol(vararg.name.id().clone());
-            self.current_place_table_mut()
-                .symbol_mut(symbol)
-                .mark_parameter();
-            self.add_definition(
-                symbol.into(),
+            self.declare_parameter(
                 ParameterDefinitionNodeRef::VariadicPositionalParameter(vararg),
+                None,
             );
         }
         if let Some(kwarg) = parameters.kwarg.as_ref() {
-            let symbol = self.add_symbol(kwarg.name.id().clone());
-            self.current_place_table_mut()
-                .symbol_mut(symbol)
-                .mark_parameter();
-            self.add_definition(
-                symbol.into(),
+            self.declare_parameter(
                 ParameterDefinitionNodeRef::VariadicKeywordParameter(kwarg),
+                None,
             );
         }
-    }
-
-    fn declare_parameter(&mut self, parameter: &'ast ast::ParameterWithDefault) {
-        let symbol = self.add_symbol(parameter.name().id().clone());
-
-        self.add_definition(
-            symbol.into(),
-            ParameterDefinitionNodeRef::Parameter(parameter),
-        );
-
-        self.current_place_table_mut()
-            .symbol_mut(symbol)
-            .mark_parameter();
     }
 
     fn declare_lambda_parameters(
@@ -2756,66 +2735,58 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         parameters: &'ast ast::Parameters,
         lambda: &'ast ast::ExprLambda,
     ) {
-        let mut index = 0;
-        for parameter in &parameters.posonlyargs {
-            self.declare_lambda_parameter(index, parameter, lambda);
-            index += 1;
-        }
-        for parameter in &parameters.args {
-            self.declare_lambda_parameter(index, parameter, lambda);
-            index += 1;
-        }
-        if let Some(vararg) = parameters.vararg.as_ref() {
-            let symbol = self.add_symbol(vararg.name.id().clone());
-            self.current_place_table_mut()
-                .symbol_mut(symbol)
-                .mark_parameter();
-            self.add_definition(
-                symbol.into(),
-                LambdaParameterDefinitionNodeRef {
-                    index,
-                    lambda,
-                    parameter: ParameterDefinitionNodeRef::VariadicPositionalParameter(vararg),
-                },
-            );
-            index += 1;
-        }
-        for parameter in &parameters.kwonlyargs {
-            self.declare_lambda_parameter(index, parameter, lambda);
-            index += 1;
-        }
-        if let Some(kwarg) = parameters.kwarg.as_ref() {
-            let symbol = self.add_symbol(kwarg.name.id().clone());
-            self.current_place_table_mut()
-                .symbol_mut(symbol)
-                .mark_parameter();
-            self.add_definition(
-                symbol.into(),
-                LambdaParameterDefinitionNodeRef {
-                    index,
-                    lambda,
-                    parameter: ParameterDefinitionNodeRef::VariadicKeywordParameter(kwarg),
-                },
-            );
+        let positional = parameters
+            .posonlyargs
+            .iter()
+            .chain(&parameters.args)
+            .map(ParameterDefinitionNodeRef::Parameter);
+        let vararg = parameters
+            .vararg
+            .as_deref()
+            .map(ParameterDefinitionNodeRef::VariadicPositionalParameter);
+        let keyword = parameters
+            .kwonlyargs
+            .iter()
+            .map(ParameterDefinitionNodeRef::Parameter);
+        let kwarg = parameters
+            .kwarg
+            .as_deref()
+            .map(ParameterDefinitionNodeRef::VariadicKeywordParameter);
+
+        for (index, parameter) in positional
+            .chain(vararg)
+            .chain(keyword)
+            .chain(kwarg)
+            .enumerate()
+        {
+            self.declare_parameter(parameter, Some((index, lambda)));
         }
     }
 
-    fn declare_lambda_parameter(
+    fn declare_parameter(
         &mut self,
-        index: usize,
-        parameter: &'ast ast::ParameterWithDefault,
-        lambda: &'ast ast::ExprLambda,
+        parameter: ParameterDefinitionNodeRef<'ast>,
+        lambda: Option<(usize, &'ast ast::ExprLambda)>,
     ) {
-        let symbol = self.add_symbol(parameter.name().id().clone());
+        let name = match parameter {
+            ParameterDefinitionNodeRef::VariadicPositionalParameter(parameter)
+            | ParameterDefinitionNodeRef::VariadicKeywordParameter(parameter) => &parameter.name,
+            ParameterDefinitionNodeRef::Parameter(parameter) => parameter.name(),
+        };
+        let symbol = self.add_symbol(name.id().clone());
 
-        self.add_definition(
-            symbol.into(),
-            LambdaParameterDefinitionNodeRef {
-                index,
-                lambda,
-                parameter: ParameterDefinitionNodeRef::Parameter(parameter),
-            },
-        );
+        if let Some((index, lambda)) = lambda {
+            self.add_definition(
+                symbol.into(),
+                LambdaParameterDefinitionNodeRef {
+                    index,
+                    lambda,
+                    parameter,
+                },
+            );
+        } else {
+            self.add_definition(symbol.into(), parameter);
+        }
 
         self.current_place_table_mut()
             .symbol_mut(symbol)
