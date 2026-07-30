@@ -83,6 +83,8 @@ struct Loop {
     continue_states: Vec<FlowSnapshot>,
 }
 
+type LoopHeaderInfo = (LoopHeaderId, FxHashSet<ScopedPlaceId>, ScopedDefinitionId);
+
 impl Loop {
     fn push_break(&mut self, state: FlowSnapshot) {
         self.break_states.push(state);
@@ -1720,12 +1722,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// Create loop header definitions for all places that are bound within a loop. Return the
     /// `LoopHeaderId` referenced by those definitions, the set of bound place IDs, and the lower
-    /// bound `ScopedDefinitionId` for definitions created within the loop.
+    /// bound `ScopedDefinitionId` for definitions created within the loop. Returns `None` when
+    /// there are no bound places, avoiding an unnecessary loop-header allocation.
     fn synthesize_loop_header_definitions(
         &mut self,
         loop_stmt: LoopStmtRef<'ast>,
         bound_places: Vec<PlaceExpr>,
-    ) -> (LoopHeaderId, FxHashSet<ScopedPlaceId>, ScopedDefinitionId) {
+    ) -> Option<LoopHeaderInfo> {
+        if bound_places.is_empty() {
+            return None;
+        }
+
         let loop_header_id = self.current_use_def_map_mut().reserve_loop_header();
         let mut bound_place_ids: FxHashSet<ScopedPlaceId> = FxHashSet::default();
         for place_expr in bound_places {
@@ -1741,7 +1748,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
         }
         let loop_min_definition_id = self.current_use_def_map_mut().next_definition_id();
-        (loop_header_id, bound_place_ids, loop_min_definition_id)
+        Some((loop_header_id, bound_place_ids, loop_min_definition_id))
+    }
+
+    /// Incorporates `continue` edges before recording the bindings visible at the loop header.
+    fn finish_loop_header(&mut self, loop_state: &mut Loop, header: Option<LoopHeaderInfo>) {
+        for continue_state in loop_state.continue_states.drain(..) {
+            self.flow_merge(continue_state);
+        }
+        if let Some((header_id, bound_place_ids, loop_min_definition_id)) = header {
+            self.populate_loop_header(&bound_place_ids, header_id, loop_min_definition_id);
+        }
     }
 
     /// Build a `LoopHeader` that tracks all the variables bound in a loop, which will be visible
@@ -3660,15 +3677,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // definition for each bound place. See `struct LoopHeader` for more on this. Loop
                 // header definitions store the ID of a reserved `LoopHeader` that we populate
                 // after walking the body.
-                let bound_places = loop_bindings_visitor::collect_while_loop_bindings(while_stmt);
-                let mut maybe_loop_header_info = None;
-                // Avoid allocating a `LoopHeader` if there are no bound places in this loop.
-                if !bound_places.is_empty() {
-                    maybe_loop_header_info = Some(self.synthesize_loop_header_definitions(
-                        LoopStmtRef::While(while_stmt),
-                        bound_places,
-                    ));
-                }
+                let maybe_loop_header_info = self.synthesize_loop_header_definitions(
+                    LoopStmtRef::While(while_stmt),
+                    loop_bindings_visitor::collect_while_loop_bindings(while_stmt),
+                );
 
                 // Visit the test expression after creating loop headers, so that loop-back values
                 // are visible.
@@ -3687,22 +3699,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 let outer_loop = self.push_loop();
                 self.visit_body(body);
-                let this_loop = self.pop_loop(outer_loop);
-
-                // Loop-back bindings include everything that's visible if/when control reaches the
-                // end of the loop body, and they also include everything that's visible to a
-                // `continue` statement. Merge the `continue` states before collecting bindings.
-                for continue_state in this_loop.continue_states {
-                    self.flow_merge(continue_state);
-                }
-
-                // Collect all the loop-back bindings (including the `continue` states we just
-                // merged) and populate the `LoopHeader`.
-                if let Some((header_id, bound_place_ids, loop_min_definition_id)) =
-                    maybe_loop_header_info
-                {
-                    self.populate_loop_header(&bound_place_ids, header_id, loop_min_definition_id);
-                }
+                let mut this_loop = self.pop_loop(outer_loop);
+                self.finish_loop_header(&mut this_loop, maybe_loop_header_info);
 
                 // We execute the `else` branch once the condition evaluates to false. This could
                 // happen without ever executing the body, if the condition is false the first time
@@ -3811,36 +3809,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // definition for each bound place. See `struct LoopHeader` for more on this. Loop
                 // header definitions store the ID of a reserved `LoopHeader` that we populate
                 // after walking the body.
-                let bound_places = loop_bindings_visitor::collect_for_loop_bindings(for_stmt);
-                let mut maybe_loop_header_info = None;
-                // Avoid allocating a `LoopHeader` if there are no bound places in this loop.
-                if !bound_places.is_empty() {
-                    maybe_loop_header_info = Some(self.synthesize_loop_header_definitions(
-                        LoopStmtRef::For(for_stmt),
-                        bound_places,
-                    ));
-                }
+                let maybe_loop_header_info = self.synthesize_loop_header_definitions(
+                    LoopStmtRef::For(for_stmt),
+                    loop_bindings_visitor::collect_for_loop_bindings(for_stmt),
+                );
 
                 self.add_unpackable_assignment(&Unpackable::For(for_stmt), target, iter_expr);
 
                 let outer_loop = self.push_loop();
                 self.visit_body(body);
-                let this_loop = self.pop_loop(outer_loop);
-
-                // Loop-back bindings include everything that's visible if/when control reaches the
-                // end of the loop body, and they also include everything that's visible to a
-                // `continue` statement. Merge the `continue` states before collecting bindings.
-                for continue_state in this_loop.continue_states {
-                    self.flow_merge(continue_state);
-                }
-
-                // Collect all the loop-back bindings (including the `continue` states we just
-                // merged) and populate the `LoopHeader`.
-                if let Some((header_id, bound_place_ids, loop_min_definition_id)) =
-                    maybe_loop_header_info
-                {
-                    self.populate_loop_header(&bound_place_ids, header_id, loop_min_definition_id);
-                }
+                let mut this_loop = self.pop_loop(outer_loop);
+                self.finish_loop_header(&mut this_loop, maybe_loop_header_info);
 
                 if let Some(after_iter) = after_empty_iter {
                     self.flow_restore(after_iter);
