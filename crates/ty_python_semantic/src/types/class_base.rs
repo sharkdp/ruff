@@ -335,12 +335,7 @@ impl<'db> ClassBase<'db> {
     pub(super) fn into_class(self) -> Option<ClassType<'db>> {
         match self {
             Self::Class(class) => Some(class),
-            Self::Any
-            | Self::Dynamic(_)
-            | Self::Divergent(_)
-            | Self::Generic
-            | Self::Protocol
-            | Self::TypedDict(_) => None,
+            _ => None,
         }
     }
 
