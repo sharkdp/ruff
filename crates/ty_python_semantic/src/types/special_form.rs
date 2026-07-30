@@ -1031,12 +1031,7 @@ pub enum TypeQualifier {
 
 impl TypeQualifier {
     const fn is_callable(self) -> bool {
-        match self {
-            Self::InitVar => true,
-            Self::ReadOnly | Self::Final | Self::ClassVar | Self::Required | Self::NotRequired => {
-                false
-            }
-        }
+        matches!(self, Self::InitVar)
     }
 
     const fn check_module(self, module: KnownModule) -> bool {
