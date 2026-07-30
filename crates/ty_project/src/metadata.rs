@@ -444,12 +444,7 @@ impl ProjectMetadata {
     ///
     /// Options applied later take precedence over options applied earlier.
     pub fn apply_override_options(&mut self, options: Options) {
-        if let Some(existing) = self.override_options.as_mut() {
-            let previous = std::mem::replace(existing.as_mut(), options);
-            existing.combine_with(previous);
-        } else {
-            self.override_options = Some(Box::new(options));
-        }
+        Self::apply_options(&mut self.override_options, options);
     }
 
     pub fn has_uv_workspace(&self) -> bool {
@@ -461,11 +456,15 @@ impl ProjectMetadata {
     /// Options applied later take precedence over options applied earlier, but all fallback options
     /// have lower precedence than the raw, uv workspace, and user-level options.
     pub fn apply_fallback_options(&mut self, options: Options) {
-        if let Some(existing) = self.fallback_options.as_mut() {
+        Self::apply_options(&mut self.fallback_options, options);
+    }
+
+    fn apply_options(target: &mut Option<Box<Options>>, options: Options) {
+        if let Some(existing) = target.as_mut() {
             let previous = std::mem::replace(existing.as_mut(), options);
             existing.combine_with(previous);
         } else {
-            self.fallback_options = Some(Box::new(options));
+            *target = Some(Box::new(options));
         }
     }
 
