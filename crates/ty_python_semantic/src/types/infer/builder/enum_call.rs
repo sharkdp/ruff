@@ -101,7 +101,7 @@ enum SequenceEnumMember<'db> {
 }
 
 /// Distinguishes whether a sequence-form `names` argument uses bare names or explicit pairs.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Eq, PartialEq)]
 enum SequenceEnumMemberForm {
     /// The sequence is a list of member names.
     Names,
@@ -720,52 +720,39 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             if matches!(elt, ast::Expr::Starred(_)) {
                 return EnumMembersArgParseResult::Invalid;
             }
-            match self.classify_sequence_enum_member(elt) {
+            let member_form = match self.classify_sequence_enum_member(elt) {
                 SequenceEnumMember::NameKnown(name) => {
-                    if matches!(form, Some(SequenceEnumMemberForm::Pairs)) {
-                        return EnumMembersArgParseResult::Invalid;
-                    }
-                    form = Some(SequenceEnumMemberForm::Names);
                     names.push(name);
+                    SequenceEnumMemberForm::Names
                 }
                 SequenceEnumMember::NameOpaque => {
-                    if matches!(form, Some(SequenceEnumMemberForm::Pairs)) {
-                        return EnumMembersArgParseResult::Invalid;
-                    }
-                    form = Some(SequenceEnumMemberForm::Names);
                     has_opaque_members = true;
+                    SequenceEnumMemberForm::Names
                 }
                 SequenceEnumMember::PairKnown(name, value) => {
-                    if matches!(form, Some(SequenceEnumMemberForm::Names)) {
-                        return EnumMembersArgParseResult::Invalid;
-                    }
-                    form = Some(SequenceEnumMemberForm::Pairs);
                     explicit_members.push((name, value));
+                    SequenceEnumMemberForm::Pairs
                 }
                 SequenceEnumMember::PairOpaque => {
-                    if matches!(form, Some(SequenceEnumMemberForm::Names)) {
-                        return EnumMembersArgParseResult::Invalid;
-                    }
-                    form = Some(SequenceEnumMemberForm::Pairs);
                     has_opaque_members = true;
+                    SequenceEnumMemberForm::Pairs
                 }
                 SequenceEnumMember::Invalid => return EnumMembersArgParseResult::Invalid,
+            };
+
+            if form.is_some_and(|previous| previous != member_form) {
+                return EnumMembersArgParseResult::Invalid;
             }
+            form = Some(member_form);
         }
 
         if has_opaque_members {
             return EnumMembersArgParseResult::Unknown;
         }
 
-        if matches!(form, Some(SequenceEnumMemberForm::Names)) {
+        if !matches!(form, Some(SequenceEnumMemberForm::Pairs)) {
             return EnumMembersArgParseResult::Known(KnownEnumMembers {
                 members: enum_members_from_names(db, names, start, base_class),
-                value_form: EnumMemberValueForm::Generated,
-            });
-        }
-        if form.is_none() {
-            return EnumMembersArgParseResult::Known(KnownEnumMembers {
-                members: vec![],
                 value_form: EnumMemberValueForm::Generated,
             });
         }
