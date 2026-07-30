@@ -969,11 +969,8 @@ pub(crate) fn enum_metadata<'db>(
         }
     };
 
-    // This is a fast path to avoid traversing the MRO of known classes
-    if class
-        .known(db)
-        .is_some_and(|known_class| !known_class.is_enum_subclass_with_members())
-    {
+    // This is a fast path to avoid traversing the MRO of known classes.
+    if class.known(db).is_some() {
         return None;
     }
 
