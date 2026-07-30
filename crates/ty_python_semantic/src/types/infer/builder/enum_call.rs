@@ -837,41 +837,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
-    /// Extract a `(name, value)` pair from a tuple element like `("RED", 1)`.
-    fn parse_explicit_enum_member(&mut self, elt: &ast::Expr) -> Option<(Name, Type<'db>)> {
-        let pair = match elt {
-            ast::Expr::Tuple(tup) => &tup.elts,
-            ast::Expr::List(list) => &list.elts,
-            _ => return None,
-        };
-        let [name_expr, value_expr] = &**pair else {
-            return None;
-        };
-        let db = self.db();
-        let name_ty = self.expression_type(name_expr);
-        let name = Name::new(name_ty.as_string_literal()?.value(db));
-        let value = self.expression_type(value_expr);
-        Some((name, value))
-    }
-
-    /// Returns `true` if `elt` could be an explicit `(name, value)` member pair.
-    ///
-    /// This is used when the name position is not a known string literal, but
-    /// is still compatible with `str`.
-    fn is_potential_explicit_enum_member(&mut self, elt: &ast::Expr) -> bool {
-        let pair = match elt {
-            ast::Expr::Tuple(tup) => &tup.elts,
-            ast::Expr::List(list) => &list.elts,
-            _ => return false,
-        };
-        let [name_expr, _value_expr] = &**pair else {
-            return false;
-        };
-        let db = self.db();
-        let name_ty = self.expression_type(name_expr);
-        name_ty.is_dynamic() || name_ty.is_assignable_to(db, KnownClass::Str.to_instance(db))
-    }
-
     /// Classifies one element from a sequence-form `names` argument.
     ///
     /// This distinguishes between known names, opaque names, known explicit
@@ -882,16 +847,32 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if let Some(string_lit) = ty.as_string_literal() {
             return SequenceEnumMember::NameKnown(Name::new(string_lit.value(db)));
         }
-        if let Some((name, value)) = self.parse_explicit_enum_member(elt) {
-            return SequenceEnumMember::PairKnown(name, value);
-        }
         if ty.is_dynamic() || ty.is_assignable_to(db, KnownClass::Str.to_instance(db)) {
             return SequenceEnumMember::NameOpaque;
         }
-        if self.is_potential_explicit_enum_member(elt) {
-            return SequenceEnumMember::PairOpaque;
+
+        let pair = match elt {
+            ast::Expr::Tuple(tuple) => &tuple.elts,
+            ast::Expr::List(list) => &list.elts,
+            _ => return SequenceEnumMember::Invalid,
+        };
+        let [name_expr, value_expr] = &**pair else {
+            return SequenceEnumMember::Invalid;
+        };
+
+        let name_ty = self.expression_type(name_expr);
+        if let Some(name) = name_ty.as_string_literal() {
+            SequenceEnumMember::PairKnown(
+                Name::new(name.value(db)),
+                self.expression_type(value_expr),
+            )
+        } else if name_ty.is_dynamic()
+            || name_ty.is_assignable_to(db, KnownClass::Str.to_instance(db))
+        {
+            SequenceEnumMember::PairOpaque
+        } else {
+            SequenceEnumMember::Invalid
         }
-        SequenceEnumMember::Invalid
     }
 
     fn report_invalid_enum_names_argument(
