@@ -1457,91 +1457,42 @@ unclosed table, expected `]`
     }
 
     #[test]
-    fn requires_python_less_than() -> anyhow::Result<()> {
-        let system = TestSystem::default();
-        let root = SystemPathBuf::from("/app");
-
-        system
-            .memory_file_system()
-            .write_file_all(
+    fn invalid_requires_python_constraints() -> anyhow::Result<()> {
+        for (specifier, detail) in [
+            (
+                "<3.12",
+                "value `<3.12` does not contain a lower bound. Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`.",
+            ),
+            (
+                "",
+                "value `` does not contain a lower bound. Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`.",
+            ),
+            (
+                ">=999.0",
+                "The major version `999` is larger than the maximum supported value 255",
+            ),
+            (
+                "==44.44",
+                "value `==44.44` does not include any Python version supported by ty. Adjust `requires-python` to include a supported Python 3 version or specify `environment.python-version` explicitly.",
+            ),
+        ] {
+            let system = TestSystem::default();
+            let root = SystemPathBuf::from("/app");
+            system.memory_file_system().write_file_all(
                 root.join("pyproject.toml"),
-                r#"
-                [project]
-                requires-python = "<3.12"
-                "#,
-            )
-            .context("Failed to write file")?;
+                &format!("[project]\nrequires-python = {specifier:?}"),
+            )?;
 
-        let Err(error) = ProjectMetadata::discover(&root, &system) else {
-            return Err(anyhow!(
-                "Expected project discovery to fail because the `requires-python` doesn't specify a lower bound (it only specifies an upper bound)."
-            ));
-        };
-
-        assert_error_chain_eq(
-            error,
-            "Invalid `requires-python` version specifier (`/app/pyproject.toml`): value `<3.12` does not contain a lower bound. Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`.",
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn requires_python_no_specifiers() -> anyhow::Result<()> {
-        let system = TestSystem::default();
-        let root = SystemPathBuf::from("/app");
-
-        system
-            .memory_file_system()
-            .write_file_all(
-                root.join("pyproject.toml"),
-                r#"
-                [project]
-                requires-python = ""
-                "#,
-            )
-            .context("Failed to write file")?;
-
-        let Err(error) = ProjectMetadata::discover(&root, &system) else {
-            return Err(anyhow!(
-                "Expected project discovery to fail because the `requires-python` specifiers are empty and don't define a lower bound."
-            ));
-        };
-
-        assert_error_chain_eq(
-            error,
-            "Invalid `requires-python` version specifier (`/app/pyproject.toml`): value `` does not contain a lower bound. Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`.",
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn requires_python_too_large_major_version() -> anyhow::Result<()> {
-        let system = TestSystem::default();
-        let root = SystemPathBuf::from("/app");
-
-        system
-            .memory_file_system()
-            .write_file_all(
-                root.join("pyproject.toml"),
-                r#"
-                [project]
-                requires-python = ">=999.0"
-                "#,
-            )
-            .context("Failed to write file")?;
-
-        let Err(error) = ProjectMetadata::discover(&root, &system) else {
-            return Err(anyhow!(
-                "Expected project discovery to fail because of the requires-python major version that is larger than 255."
-            ));
-        };
-
-        assert_error_chain_eq(
-            error,
-            "Invalid `requires-python` version specifier (`/app/pyproject.toml`): The major version `999` is larger than the maximum supported value 255",
-        );
+            let Err(error) = ProjectMetadata::discover(&root, &system) else {
+                return Err(anyhow!("Expected `{specifier}` to be rejected"));
+            };
+            assert_error_chain_eq(
+                error,
+                &format!(
+                    "Invalid `requires-python` version specifier (`/app/pyproject.toml`): {detail}"
+                ),
+            );
+        }
 
         Ok(())
     }
@@ -1573,36 +1524,6 @@ unclosed table, expected `]`
                 .copied()
                 .map(PythonVersion::from),
             Some(PythonVersion::PY37)
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn requires_python_unsupported_future_version() -> anyhow::Result<()> {
-        let system = TestSystem::default();
-        let root = SystemPathBuf::from("/app");
-
-        system
-            .memory_file_system()
-            .write_file_all(
-                root.join("pyproject.toml"),
-                r#"
-                [project]
-                requires-python = "==44.44"
-                "#,
-            )
-            .context("Failed to write file")?;
-
-        let Err(error) = ProjectMetadata::discover(&root, &system) else {
-            return Err(anyhow!(
-                "Expected project discovery to fail because `requires-python` does not include a ty-supported version."
-            ));
-        };
-
-        assert_error_chain_eq(
-            error,
-            "Invalid `requires-python` version specifier (`/app/pyproject.toml`): value `==44.44` does not include any Python version supported by ty. Adjust `requires-python` to include a supported Python 3 version or specify `environment.python-version` explicitly.",
         );
 
         Ok(())
