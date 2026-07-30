@@ -285,84 +285,41 @@ pub enum NodeWithScopeRef<'a> {
     GeneratorExpression(&'a ast::ExprGenerator),
 }
 
+macro_rules! map_scope_node {
+    ($node:expr, $target:ident, |$value:ident| $mapping:expr) => {
+        match $node {
+            NodeWithScopeRef::Module => $target::Module,
+            NodeWithScopeRef::Class($value) => $target::Class($mapping),
+            NodeWithScopeRef::Function($value) => $target::Function($mapping),
+            NodeWithScopeRef::Lambda($value) => $target::Lambda($mapping),
+            NodeWithScopeRef::FunctionTypeParameters($value) => {
+                $target::FunctionTypeParameters($mapping)
+            }
+            NodeWithScopeRef::ClassTypeParameters($value) => $target::ClassTypeParameters($mapping),
+            NodeWithScopeRef::TypeAlias($value) => $target::TypeAlias($mapping),
+            NodeWithScopeRef::TypeAliasTypeParameters($value) => {
+                $target::TypeAliasTypeParameters($mapping)
+            }
+            NodeWithScopeRef::ListComprehension($value) => $target::ListComprehension($mapping),
+            NodeWithScopeRef::SetComprehension($value) => $target::SetComprehension($mapping),
+            NodeWithScopeRef::DictComprehension($value) => $target::DictComprehension($mapping),
+            NodeWithScopeRef::GeneratorExpression($value) => $target::GeneratorExpression($mapping),
+        }
+    };
+}
+
 impl NodeWithScopeRef<'_> {
     /// Converts the unowned reference to an owned [`NodeWithScopeKind`].
     ///
     /// Note that node wrapped by `self` must be a child of `module`.
     pub(super) fn to_kind(self, module: &ParsedModuleRef) -> NodeWithScopeKind {
-        match self {
-            NodeWithScopeRef::Module => NodeWithScopeKind::Module,
-            NodeWithScopeRef::Class(class) => {
-                NodeWithScopeKind::Class(AstNodeRef::new(module, class))
-            }
-            NodeWithScopeRef::Function(function) => {
-                NodeWithScopeKind::Function(AstNodeRef::new(module, function))
-            }
-            NodeWithScopeRef::TypeAlias(type_alias) => {
-                NodeWithScopeKind::TypeAlias(AstNodeRef::new(module, type_alias))
-            }
-            NodeWithScopeRef::TypeAliasTypeParameters(type_alias) => {
-                NodeWithScopeKind::TypeAliasTypeParameters(AstNodeRef::new(module, type_alias))
-            }
-            NodeWithScopeRef::Lambda(lambda) => {
-                NodeWithScopeKind::Lambda(AstNodeRef::new(module, lambda))
-            }
-            NodeWithScopeRef::FunctionTypeParameters(function) => {
-                NodeWithScopeKind::FunctionTypeParameters(AstNodeRef::new(module, function))
-            }
-            NodeWithScopeRef::ClassTypeParameters(class) => {
-                NodeWithScopeKind::ClassTypeParameters(AstNodeRef::new(module, class))
-            }
-            NodeWithScopeRef::ListComprehension(comprehension) => {
-                NodeWithScopeKind::ListComprehension(AstNodeRef::new(module, comprehension))
-            }
-            NodeWithScopeRef::SetComprehension(comprehension) => {
-                NodeWithScopeKind::SetComprehension(AstNodeRef::new(module, comprehension))
-            }
-            NodeWithScopeRef::DictComprehension(comprehension) => {
-                NodeWithScopeKind::DictComprehension(AstNodeRef::new(module, comprehension))
-            }
-            NodeWithScopeRef::GeneratorExpression(generator) => {
-                NodeWithScopeKind::GeneratorExpression(AstNodeRef::new(module, generator))
-            }
-        }
+        map_scope_node!(self, NodeWithScopeKind, |node| AstNodeRef::new(
+            module, node
+        ))
     }
 
     pub fn node_key(self) -> NodeWithScopeKey {
-        match self {
-            NodeWithScopeRef::Module => NodeWithScopeKey::Module,
-            NodeWithScopeRef::Class(class) => NodeWithScopeKey::Class(NodeKey::from_node(class)),
-            NodeWithScopeRef::Function(function) => {
-                NodeWithScopeKey::Function(NodeKey::from_node(function))
-            }
-            NodeWithScopeRef::Lambda(lambda) => {
-                NodeWithScopeKey::Lambda(NodeKey::from_node(lambda))
-            }
-            NodeWithScopeRef::FunctionTypeParameters(function) => {
-                NodeWithScopeKey::FunctionTypeParameters(NodeKey::from_node(function))
-            }
-            NodeWithScopeRef::ClassTypeParameters(class) => {
-                NodeWithScopeKey::ClassTypeParameters(NodeKey::from_node(class))
-            }
-            NodeWithScopeRef::TypeAlias(type_alias) => {
-                NodeWithScopeKey::TypeAlias(NodeKey::from_node(type_alias))
-            }
-            NodeWithScopeRef::TypeAliasTypeParameters(type_alias) => {
-                NodeWithScopeKey::TypeAliasTypeParameters(NodeKey::from_node(type_alias))
-            }
-            NodeWithScopeRef::ListComprehension(comprehension) => {
-                NodeWithScopeKey::ListComprehension(NodeKey::from_node(comprehension))
-            }
-            NodeWithScopeRef::SetComprehension(comprehension) => {
-                NodeWithScopeKey::SetComprehension(NodeKey::from_node(comprehension))
-            }
-            NodeWithScopeRef::DictComprehension(comprehension) => {
-                NodeWithScopeKey::DictComprehension(NodeKey::from_node(comprehension))
-            }
-            NodeWithScopeRef::GeneratorExpression(generator) => {
-                NodeWithScopeKey::GeneratorExpression(NodeKey::from_node(generator))
-            }
-        }
+        map_scope_node!(self, NodeWithScopeKey, |node| NodeKey::from_node(node))
     }
 }
 
