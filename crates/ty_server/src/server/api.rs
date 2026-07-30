@@ -427,51 +427,6 @@ fn sync_notification_task<N: traits::SyncNotificationHandler>(
     }))
 }
 
-#[expect(dead_code)]
-fn background_notification_thread<N>(
-    req: server::Notification,
-    schedule: BackgroundSchedule,
-) -> Result<Task>
-where
-    N: traits::BackgroundDocumentNotificationHandler,
-    <<N as NotificationHandler>::NotificationType as Notification>::Params: UnwindSafe,
-{
-    let (id, params) = cast_notification::<N>(req)?;
-    Ok(Task::background(schedule, move |session: &Session| {
-        let uri = N::document_uri(&params);
-        let Ok(snapshot) = session.snapshot_document(&uri) else {
-            let reason = format!("Document {uri} is not open in the session");
-            tracing::warn!(
-                "Ignoring notification id={id} method={} because {reason}",
-                N::METHOD
-            );
-            return Box::new(|_| {});
-        };
-
-        let log_guidance = snapshot.client_name().log_guidance();
-
-        Box::new(move |client| {
-            let _span = tracing::debug_span!("notification", method = %N::METHOD).entered();
-
-            let result = match ruff_db::panic::catch_unwind(|| {
-                N::run_with_snapshot(snapshot, client, params)
-            }) {
-                Ok(result) => result,
-                Err(panic) => {
-                    tracing::error!("An error occurred while running {id}: {panic}");
-                    client.show_error_message(format!("ty encountered a panic. {log_guidance}"));
-                    return;
-                }
-            };
-
-            if let Err(err) = result {
-                tracing::error!("An error occurred while running {id}: {err}");
-                client.show_error_message(format!("ty encountered a problem. {log_guidance}"));
-            }
-        })
-    }))
-}
-
 /// Tries to cast a serialized request from the server into
 /// a parameter type for a specific request handler.
 /// It is *highly* recommended to not override this function in your

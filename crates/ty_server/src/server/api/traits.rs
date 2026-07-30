@@ -14,13 +14,10 @@
 //! contains the current state of the server. This is useful for handlers that need to modify
 //! the server state such as when the content of a file changes.
 //!
-//! The [`BackgroundDocumentRequestHandler`] and [`BackgroundDocumentNotificationHandler`] traits
-//! are for handlers that operate on a single document and can be executed on a background thread.
-//! These handlers will have access to a snapshot of the document at the time of the request or
-//! notification, allowing them to perform operations without blocking the main loop. There is also
-//! the [`BackgroundRequestHandler`] trait for handlers that operate on the entire session, which
-//! includes all the workspaces, instead of a single document and can also be executed on a
-//! background thread like fetching the workspace diagnostics.
+//! The [`BackgroundDocumentRequestHandler`] trait is for handlers that operate on a single
+//! document and can be executed on a background thread using a snapshot of the document. There is
+//! also the [`BackgroundRequestHandler`] trait for handlers that operate on the entire session,
+//! such as fetching workspace diagnostics.
 //!
 //! The [`RetriableRequestHandler`] trait is a marker trait for handlers that can be retried if the
 //! Salsa database is modified during execution.
@@ -179,20 +176,6 @@ pub(super) trait NotificationHandler {
 pub(super) trait SyncNotificationHandler: NotificationHandler {
     fn run(
         session: &mut Session,
-        client: &Client,
-        params: <<Self as NotificationHandler>::NotificationType as Notification>::Params,
-    ) -> super::Result<()>;
-}
-
-/// A notification handler that can be run on a background thread.
-pub(super) trait BackgroundDocumentNotificationHandler: NotificationHandler {
-    /// Returns the URI of the document that this notification handler operates on.
-    fn document_uri(
-        params: &<<Self as NotificationHandler>::NotificationType as Notification>::Params,
-    ) -> Cow<'_, Uri>;
-
-    fn run_with_snapshot(
-        snapshot: DocumentSnapshot,
         client: &Client,
         params: <<Self as NotificationHandler>::NotificationType as Notification>::Params,
     ) -> super::Result<()>;
