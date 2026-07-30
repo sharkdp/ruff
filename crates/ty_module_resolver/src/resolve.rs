@@ -37,7 +37,7 @@ use std::iter::FusedIterator;
 
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
-use ruff_db::files::{File, FilePath, FileRootKind, directory_listing, system_path_to_file};
+use ruff_db::files::{File, FileRootKind, directory_listing, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
@@ -263,23 +263,6 @@ fn desperately_resolve_module<'db>(
         .into_iter()
         .next()
         .map(|candidate| candidate.into_module(db, name))
-}
-
-/// Resolves the module for the given path.
-///
-/// Returns `None` if the path is not a module locatable via any of the known search paths.
-#[allow(unused)]
-pub(crate) fn path_to_module<'db>(db: &'db dyn Db, path: &FilePath) -> Option<Module<'db>> {
-    // It's not entirely clear on first sight why this method calls `file_to_module` instead of
-    // it being the other way round, considering that the first thing that `file_to_module` does
-    // is to retrieve the file's path.
-    //
-    // The reason is that `file_to_module` is a tracked Salsa query and salsa queries require that
-    // all arguments are Salsa ingredients (something stored in Salsa). `Path`s aren't salsa ingredients but
-    // `VfsFile` is. So what we do here is to retrieve the `path`'s `VfsFile` so that we can make
-    // use of Salsa's caching and invalidation.
-    let file = path.to_file(db)?;
-    file_to_module(db, file)
 }
 
 /// Resolves the module for the file with the given id.
@@ -1969,6 +1952,10 @@ mod tests {
     use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
 
     use super::*;
+
+    fn path_to_module<'db>(db: &'db dyn crate::db::Db, path: &FilePath) -> Option<Module<'db>> {
+        file_to_module(db, path.to_file(db)?)
+    }
 
     #[test]
     fn first_party_module() {
