@@ -529,15 +529,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn extend_cycle_recovery(&mut self, other: Option<Type<'db>>) {
         if let Some(other) = other {
-            match self.cycle_recovery {
-                Some(existing) => {
-                    self.cycle_recovery =
-                        Some(UnionType::from_two_elements(self.db(), existing, other));
-                }
-                None => {
-                    self.cycle_recovery = Some(other);
-                }
-            }
+            self.cycle_recovery = Some(self.cycle_recovery.map_or(other, |existing| {
+                UnionType::from_two_elements(self.db(), existing, other)
+            }));
         }
     }
 
