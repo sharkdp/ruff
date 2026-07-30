@@ -1701,88 +1701,38 @@ impl DefinitionNodeKey {
     }
 }
 
-impl From<&ast::Alias> for DefinitionNodeKey {
-    fn from(node: &ast::Alias) -> Self {
-        Self(NodeKey::from_node(node))
-    }
+macro_rules! impl_definition_node_key_from {
+    ($($node:ty),+ $(,)?) => {
+        $(
+            impl From<&$node> for DefinitionNodeKey {
+                fn from(node: &$node) -> Self {
+                    Self(NodeKey::from_node(node))
+                }
+            }
+        )+
+    };
 }
 
-impl From<&ast::StmtImportFrom> for DefinitionNodeKey {
-    fn from(node: &ast::StmtImportFrom) -> Self {
-        Self(NodeKey::from_node(node))
-    }
-}
-
-impl From<&ast::StmtFunctionDef> for DefinitionNodeKey {
-    fn from(node: &ast::StmtFunctionDef) -> Self {
-        Self(NodeKey::from_node(node))
-    }
-}
-
-impl From<&ast::StmtClassDef> for DefinitionNodeKey {
-    fn from(node: &ast::StmtClassDef) -> Self {
-        Self(NodeKey::from_node(node))
-    }
-}
-
-impl From<&ast::StmtTypeAlias> for DefinitionNodeKey {
-    fn from(node: &ast::StmtTypeAlias) -> Self {
-        Self(NodeKey::from_node(node))
-    }
-}
-
-impl From<&ast::ExprName> for DefinitionNodeKey {
-    fn from(node: &ast::ExprName) -> Self {
-        Self(NodeKey::from_node(node))
-    }
-}
-
-impl From<&ast::ExprAttribute> for DefinitionNodeKey {
-    fn from(node: &ast::ExprAttribute) -> Self {
-        Self(NodeKey::from_node(node))
-    }
-}
-
-impl From<&ast::ExprSubscript> for DefinitionNodeKey {
-    fn from(node: &ast::ExprSubscript) -> Self {
-        Self(NodeKey::from_node(node))
-    }
-}
-
-impl From<&ast::ExprNamed> for DefinitionNodeKey {
-    fn from(node: &ast::ExprNamed) -> Self {
-        Self(NodeKey::from_node(node))
-    }
-}
-
-impl From<&ast::StmtAnnAssign> for DefinitionNodeKey {
-    fn from(node: &ast::StmtAnnAssign) -> Self {
-        Self(NodeKey::from_node(node))
-    }
-}
-
-impl From<&ast::StmtAugAssign> for DefinitionNodeKey {
-    fn from(node: &ast::StmtAugAssign) -> Self {
-        Self(NodeKey::from_node(node))
-    }
-}
-
-impl From<&ast::StmtWhile> for DefinitionNodeKey {
-    fn from(node: &ast::StmtWhile) -> Self {
-        Self(NodeKey::from_node(node))
-    }
-}
-
-impl From<&ast::StmtFor> for DefinitionNodeKey {
-    fn from(node: &ast::StmtFor) -> Self {
-        Self(NodeKey::from_node(node))
-    }
-}
-
-impl From<&ast::Parameter> for DefinitionNodeKey {
-    fn from(node: &ast::Parameter) -> Self {
-        Self(NodeKey::from_node(node))
-    }
+impl_definition_node_key_from! {
+    ast::Alias,
+    ast::StmtImportFrom,
+    ast::StmtFunctionDef,
+    ast::StmtClassDef,
+    ast::StmtTypeAlias,
+    ast::ExprName,
+    ast::ExprAttribute,
+    ast::ExprSubscript,
+    ast::ExprNamed,
+    ast::StmtAnnAssign,
+    ast::StmtAugAssign,
+    ast::StmtWhile,
+    ast::StmtFor,
+    ast::Parameter,
+    ast::Identifier,
+    ast::ExceptHandlerExceptHandler,
+    ast::TypeParamTypeVar,
+    ast::TypeParamParamSpec,
+    ast::TypeParamTypeVarTuple,
 }
 
 impl From<&ast::ParameterWithDefault> for DefinitionNodeKey {
@@ -1797,36 +1747,6 @@ impl From<ast::AnyParameterRef<'_>> for DefinitionNodeKey {
             ast::AnyParameterRef::Variadic(node) => NodeKey::from_node(node),
             ast::AnyParameterRef::NonVariadic(node) => NodeKey::from_node(&node.parameter),
         })
-    }
-}
-
-impl From<&ast::Identifier> for DefinitionNodeKey {
-    fn from(identifier: &ast::Identifier) -> Self {
-        Self(NodeKey::from_node(identifier))
-    }
-}
-
-impl From<&ast::ExceptHandlerExceptHandler> for DefinitionNodeKey {
-    fn from(handler: &ast::ExceptHandlerExceptHandler) -> Self {
-        Self(NodeKey::from_node(handler))
-    }
-}
-
-impl From<&ast::TypeParamTypeVar> for DefinitionNodeKey {
-    fn from(value: &ast::TypeParamTypeVar) -> Self {
-        Self(NodeKey::from_node(value))
-    }
-}
-
-impl From<&ast::TypeParamParamSpec> for DefinitionNodeKey {
-    fn from(value: &ast::TypeParamParamSpec) -> Self {
-        Self(NodeKey::from_node(value))
-    }
-}
-
-impl From<&ast::TypeParamTypeVarTuple> for DefinitionNodeKey {
-    fn from(value: &ast::TypeParamTypeVarTuple) -> Self {
-        Self(NodeKey::from_node(value))
     }
 }
 
