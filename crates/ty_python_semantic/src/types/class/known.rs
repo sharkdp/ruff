@@ -215,92 +215,11 @@ impl KnownClass {
             | Self::Path => Some(Truthiness::AlwaysTrue),
 
             Self::NoneType => Some(Truthiness::AlwaysFalse),
-
-            Self::BaseException
-            | Self::Exception
-            | Self::Warning
-            | Self::NotImplementedError
-            | Self::ExceptionGroup
-            | Self::Object
-            | Self::OrderedDict
-            | Self::BaseExceptionGroup
-            | Self::Bool
-            | Self::Str
-            | Self::List
-            | Self::GenericAlias
-            | Self::NewType
-            | Self::StdlibAlias
-            | Self::Hashable
-            | Self::SupportsIndex
-            | Self::Set
-            | Self::Int
-            | Self::Type
-            | Self::Bytes
-            | Self::Bytearray
-            | Self::Memoryview
-            | Self::Range
-            | Self::FrozenSet
-            | Self::Property
-            | Self::SpecialForm
-            | Self::Dict
-            | Self::ModuleType
-            | Self::ChainMap
-            | Self::Complex
-            | Self::Counter
-            | Self::DefaultDict
-            | Self::Deque
-            | Self::Float
-            | Self::Enum
-            | Self::EnumProperty
-            | Self::EnumType
-            | Self::Auto
-            | Self::Member
-            | Self::Nonmember
-            | Self::StrEnum
-            | Self::IntEnum
-            | Self::Flag
-            | Self::IntFlag
-            | Self::ABCMeta
-            | Self::Iterable
-            | Self::TyExtensionsAsyncIterable
-            | Self::TyExtensionsAsyncIterator
-            | Self::TyExtensionsIterable
-            | Self::Iterator
-            | Self::TyExtensionsIterator
-            | Self::AsyncIterator
-            | Self::Sequence
-            | Self::Mapping
-            | Self::MutableMapping
-            | Self::SupportsKeysAndGetItem
-            // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
-            // and raises a `TypeError` in Python >=3.14
-            // (see https://docs.python.org/3/library/constants.html#NotImplemented)
-            | Self::NotImplementedType
-            | Self::Staticmethod
-            | Self::Classmethod
-            | Self::Awaitable
-            | Self::Generator
-            | Self::AsyncGenerator
-            | Self::Deprecated
-            | Self::Field
-            | Self::KwOnly
-            | Self::NamedTupleFallback
-            | Self::NamedTupleLike
-            | Self::ConstraintSet
-            | Self::ConstraintSetSolution
-            | Self::GenericContext
-            | Self::Specialization
-            | Self::ProtocolMeta
-            | Self::FunctoolsPartial
-            | Self::ExtensionTypedDictFallback
-            | Self::TypedDictFallback
-            | Self::PydanticBaseModel
-            | Self::PydanticBaseSettings
-            | Self::PydanticConfigDict
-            | Self::PydanticRootModel
-            | Self::PydanticStrict => Some(Truthiness::Ambiguous),
-
             Self::Tuple => None,
+
+            // This includes `NotImplemented`, whose truthiness was deprecated in Python 3.9 and
+            // raises a `TypeError` in Python >=3.14.
+            _ => Some(Truthiness::Ambiguous),
         }
     }
 
