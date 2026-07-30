@@ -319,22 +319,7 @@ impl Workspace {
         file_id: &FileHandle,
         position: Position,
     ) -> Result<Vec<LocationLink>, Error> {
-        let source = source_text(&self.db, file_id.file);
-        let index = line_index(&self.db, file_id.file);
-
-        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
-
-        let Some(targets) = goto_type_definition(&self.db, file_id.file, offset) else {
-            return Ok(Vec::new());
-        };
-
-        Ok(map_targets_to_links(
-            &self.db,
-            targets,
-            &source,
-            &index,
-            self.position_encoding,
-        ))
+        goto_location_links(self, file_id, position, goto_type_definition)
     }
 
     #[wasm_bindgen(js_name = "gotoDeclaration")]
@@ -343,22 +328,7 @@ impl Workspace {
         file_id: &FileHandle,
         position: Position,
     ) -> Result<Vec<LocationLink>, Error> {
-        let source = source_text(&self.db, file_id.file);
-        let index = line_index(&self.db, file_id.file);
-
-        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
-
-        let Some(targets) = goto_declaration(&self.db, file_id.file, offset) else {
-            return Ok(Vec::new());
-        };
-
-        Ok(map_targets_to_links(
-            &self.db,
-            targets,
-            &source,
-            &index,
-            self.position_encoding,
-        ))
+        goto_location_links(self, file_id, position, goto_declaration)
     }
 
     #[wasm_bindgen(js_name = "gotoDefinition")]
@@ -367,22 +337,7 @@ impl Workspace {
         file_id: &FileHandle,
         position: Position,
     ) -> Result<Vec<LocationLink>, Error> {
-        let source = source_text(&self.db, file_id.file);
-        let index = line_index(&self.db, file_id.file);
-
-        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
-
-        let Some(targets) = goto_definition(&self.db, file_id.file, offset) else {
-            return Ok(Vec::new());
-        };
-
-        Ok(map_targets_to_links(
-            &self.db,
-            targets,
-            &source,
-            &index,
-            self.position_encoding,
-        ))
+        goto_location_links(self, file_id, position, goto_definition)
     }
 
     #[wasm_bindgen(js_name = "gotoReferences")]
@@ -804,6 +759,29 @@ impl Workspace {
 
 pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {
     Error::new(&err.to_string())
+}
+
+fn goto_location_links(
+    workspace: &Workspace,
+    file_id: &FileHandle,
+    position: Position,
+    resolve: impl FnOnce(&dyn Db, File, TextSize) -> Option<RangedValue<NavigationTargets>>,
+) -> Result<Vec<LocationLink>, Error> {
+    let source = source_text(&workspace.db, file_id.file);
+    let index = line_index(&workspace.db, file_id.file);
+    let offset = position.to_text_size(&source, &index, workspace.position_encoding)?;
+
+    Ok(resolve(&workspace.db, file_id.file, offset)
+        .map(|targets| {
+            map_targets_to_links(
+                &workspace.db,
+                targets,
+                &source,
+                &index,
+                workspace.position_encoding,
+            )
+        })
+        .unwrap_or_default())
 }
 
 fn map_targets_to_links(
