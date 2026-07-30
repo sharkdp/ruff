@@ -541,6 +541,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    fn extend_collection_use_constraints(&mut self, constraints: &CollectionUseConstraints<'db>) {
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "constraints for distinct collection definitions are merged independently"
+        )]
+        for (definition, additional) in constraints {
+            self.collection_use_constraints
+                .entry(*definition)
+                .and_modify(|existing| existing.extend(additional))
+                .or_insert_with(|| additional.clone());
+        }
+    }
+
     fn extend_definition(
         &mut self,
         definition: Definition<'db>,
@@ -598,16 +611,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.type_expression_flags
                         .extend(extra.type_expression_flags.iter().copied());
 
-                    #[expect(
-                        clippy::iter_over_hash_type,
-                        reason = "constraints for distinct collection definitions are merged independently"
-                    )]
-                    for (collection_def, constraints) in &extra.collection_use_constraints {
-                        self.collection_use_constraints
-                            .entry(*collection_def)
-                            .and_modify(|this| this.extend(constraints))
-                            .or_insert(constraints.clone());
-                    }
+                    self.extend_collection_use_constraints(&extra.collection_use_constraints);
                 }
             }
         }
@@ -674,16 +678,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.type_expression_flags
                 .extend(extra.type_expression_flags.iter().copied());
 
-            #[expect(
-                clippy::iter_over_hash_type,
-                reason = "constraints for distinct collection definitions are merged independently"
-            )]
-            for (collection_def, constraints) in &extra.collection_use_constraints {
-                self.collection_use_constraints
-                    .entry(*collection_def)
-                    .and_modify(|this| this.extend(constraints))
-                    .or_insert(constraints.clone());
-            }
+            self.extend_collection_use_constraints(&extra.collection_use_constraints);
 
             if !matches!(self.region, InferenceRegion::Scope(..)) {
                 self.bindings.extend(extra.bindings.iter().copied());
@@ -712,16 +707,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .map(|(key, flags)| (*key, *flags)),
         );
 
-        #[expect(
-            clippy::iter_over_hash_type,
-            reason = "constraints for distinct collection definitions are merged independently"
-        )]
-        for (collection_def, constraints) in &inference.collection_use_constraints {
-            self.collection_use_constraints
-                .entry(*collection_def)
-                .and_modify(|this| this.extend(constraints))
-                .or_insert(constraints.clone());
-        }
+        self.extend_collection_use_constraints(&inference.collection_use_constraints);
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {
             self.bindings.extend(
@@ -746,16 +732,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.type_expression_flags
                 .extend(extra.type_expression_flags.iter().copied());
 
-            #[expect(
-                clippy::iter_over_hash_type,
-                reason = "constraints for distinct collection definitions are merged independently"
-            )]
-            for (collection_def, constraints) in &extra.collection_use_constraints {
-                self.collection_use_constraints
-                    .entry(*collection_def)
-                    .and_modify(|this| this.extend(constraints))
-                    .or_insert(constraints.clone());
-            }
+            self.extend_collection_use_constraints(&extra.collection_use_constraints);
         }
     }
 
@@ -11366,16 +11343,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .extend(bindings.iter().map(|(def, ty)| (*def, *ty)));
         }
 
-        #[expect(
-            clippy::iter_over_hash_type,
-            reason = "constraints for distinct collection definitions are merged independently"
-        )]
-        for (collection_def, constraints) in &collection_use_constraints {
-            self.collection_use_constraints
-                .entry(*collection_def)
-                .and_modify(|this| this.extend(constraints))
-                .or_insert(constraints.clone());
-        }
+        self.extend_collection_use_constraints(&collection_use_constraints);
     }
 }
 
