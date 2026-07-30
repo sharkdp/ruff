@@ -149,46 +149,31 @@ pub(crate) mod node_key {
     )]
     pub struct ExpressionNodeKey(NodeKey);
 
-    impl From<ast::ExprRef<'_>> for ExpressionNodeKey {
-        fn from(value: ast::ExprRef<'_>) -> Self {
-            Self(NodeKey::from_node(value))
-        }
-    }
-
-    impl From<&ast::Expr> for ExpressionNodeKey {
-        fn from(value: &ast::Expr) -> Self {
-            Self(NodeKey::from_node(value))
-        }
-    }
-
     impl From<&Box<ast::Expr>> for ExpressionNodeKey {
         fn from(value: &Box<ast::Expr>) -> Self {
             Self(NodeKey::from_node(&**value))
         }
     }
 
-    impl From<&ast::ExprCall> for ExpressionNodeKey {
-        fn from(value: &ast::ExprCall) -> Self {
-            Self(NodeKey::from_node(value))
-        }
+    macro_rules! impl_expression_node_key_from {
+        ($($node:ty),+ $(,)?) => {
+            $(
+                impl From<$node> for ExpressionNodeKey {
+                    fn from(value: $node) -> Self {
+                        Self(NodeKey::from_node(value))
+                    }
+                }
+            )+
+        };
     }
 
-    impl From<&ast::ExprLambda> for ExpressionNodeKey {
-        fn from(value: &ast::ExprLambda) -> Self {
-            Self(NodeKey::from_node(value))
-        }
-    }
-
-    impl From<&ast::Identifier> for ExpressionNodeKey {
-        fn from(value: &ast::Identifier) -> Self {
-            Self(NodeKey::from_node(value))
-        }
-    }
-
-    impl From<&ast::Keyword> for ExpressionNodeKey {
-        fn from(value: &ast::Keyword) -> Self {
-            Self(NodeKey::from_node(value))
-        }
+    impl_expression_node_key_from! {
+        ast::ExprRef<'_>,
+        &ast::Expr,
+        &ast::ExprCall,
+        &ast::ExprLambda,
+        &ast::Identifier,
+        &ast::Keyword,
     }
 
     impl<T> From<&AstNodeRef<T>> for ExpressionNodeKey {
