@@ -2833,76 +2833,46 @@ class X:
     }
 
     #[test]
-    fn deprecated_function() {
-        let test = public_test(
-            "\
+    fn deprecated_symbols() {
+        for (source, expected) in [
+            (
+                "\
 @deprecated('use new_foo instead')
 def foo(): ...
 
 def bar(): ...
 ",
-        );
-        let symbols = test.exported_symbols();
-
-        let syms: Vec<_> = symbols.iter().collect();
-        assert_eq!(syms.len(), 2);
-
-        let (_, foo) = &syms[0];
-        assert_eq!(&*foo.name, "foo");
-        assert!(foo.deprecated);
-
-        let (_, bar) = &syms[1];
-        assert_eq!(&*bar.name, "bar");
-        assert!(!bar.deprecated);
-    }
-
-    #[test]
-    fn deprecated_class() {
-        let test = public_test(
-            "\
+                [("foo", true), ("bar", false)],
+            ),
+            (
+                "\
 @deprecated('use NewClass instead')
 class OldClass: ...
 
 class NewClass: ...
 ",
-        );
-        let symbols = test.exported_symbols();
-
-        let syms: Vec<_> = symbols.iter().collect();
-        assert_eq!(syms.len(), 2);
-
-        let (_, old) = &syms[0];
-        assert_eq!(&*old.name, "OldClass");
-        assert!(old.deprecated);
-
-        let (_, new) = &syms[1];
-        assert_eq!(&*new.name, "NewClass");
-        assert!(!new.deprecated);
-    }
-
-    #[test]
-    fn deprecated_bare_decorator() {
-        let test = public_test(
-            "\
+                [("OldClass", true), ("NewClass", false)],
+            ),
+            (
+                "\
 @deprecated
 def foo(): ...
 
 @deprecated
 class C: ...
 ",
-        );
-        let symbols = test.exported_symbols();
+                [("foo", true), ("C", true)],
+            ),
+        ] {
+            let test = public_test(source);
+            let symbols: Vec<_> = test.exported_symbols().iter().collect();
 
-        let syms: Vec<_> = symbols.iter().collect();
-        assert_eq!(syms.len(), 2);
-
-        let (_, foo) = &syms[0];
-        assert_eq!(&*foo.name, "foo");
-        assert!(foo.deprecated);
-
-        let (_, c) = &syms[1];
-        assert_eq!(&*c.name, "C");
-        assert!(foo.deprecated);
+            assert_eq!(symbols.len(), expected.len());
+            for ((_, symbol), (name, deprecated)) in symbols.iter().zip(expected) {
+                assert_eq!(&*symbol.name, name);
+                assert_eq!(symbol.deprecated, deprecated);
+            }
+        }
     }
 
     fn matches(query: &str, symbol: &str) -> bool {
