@@ -200,26 +200,24 @@ mod tests {
     use ruff_python_parser::parse_module;
     use ruff_python_trivia::textwrap::dedent;
 
-    // Test collecting `while` loop bindings.
-
-    fn collect_while_loop_place_names(code: &str) -> Vec<String> {
+    fn collect_loop_place_names(code: &str) -> Vec<String> {
         let parsed = parse_module(code).expect("valid Python code");
-        let stmt = &parsed.suite()[0];
-        let ast::Stmt::While(while_stmt) = stmt else {
-            panic!("Expected a while statement");
+        let bindings = match &parsed.suite()[0] {
+            ast::Stmt::While(statement) => collect_while_loop_bindings(statement),
+            ast::Stmt::For(statement) => collect_for_loop_bindings(statement),
+            _ => panic!("Expected a loop statement"),
         };
-        collect_while_loop_bindings(while_stmt)
+        bindings
             .into_iter()
-            .map(|place| match place {
-                PlaceExpr::Symbol(sym) => sym.name().to_string(),
-                PlaceExpr::Member(member) => member.to_string(),
-            })
+            .map(|place| place.to_string())
             .collect()
     }
 
+    // Test collecting `while` loop bindings.
+
     #[test]
     fn test_collect_while_loop() {
-        let bindings = collect_while_loop_place_names(&dedent(
+        let bindings = collect_loop_place_names(&dedent(
             "
             while True:
                 x = 1
@@ -235,7 +233,7 @@ mod tests {
 
     #[test]
     fn test_collect_while_loop_nested() {
-        let bindings = collect_while_loop_place_names(&dedent(
+        let bindings = collect_loop_place_names(&dedent(
             "
             while True:
                 a = 1
@@ -255,7 +253,7 @@ mod tests {
 
     #[test]
     fn test_collect_while_loop_walrus_in_condition() {
-        let bindings = collect_while_loop_place_names(&dedent(
+        let bindings = collect_loop_place_names(&dedent(
             "
             while (x := get_next()):
                 y = x + 1
@@ -266,24 +264,9 @@ mod tests {
 
     // Test collecting `for` loop bindings.
 
-    fn collect_for_loop_place_names(code: &str) -> Vec<String> {
-        let parsed = parse_module(code).expect("valid Python code");
-        let stmt = &parsed.suite()[0];
-        let ast::Stmt::For(for_stmt) = stmt else {
-            panic!("Expected a for statement");
-        };
-        collect_for_loop_bindings(for_stmt)
-            .into_iter()
-            .map(|place| match place {
-                PlaceExpr::Symbol(sym) => sym.name().to_string(),
-                PlaceExpr::Member(member) => member.to_string(),
-            })
-            .collect()
-    }
-
     #[test]
     fn test_collect_for_loop() {
-        let bindings = collect_for_loop_place_names(&dedent(
+        let bindings = collect_loop_place_names(&dedent(
             "
             for i in range(10):
                 x = 1
@@ -299,7 +282,7 @@ mod tests {
 
     #[test]
     fn test_collect_for_loop_nested() {
-        let bindings = collect_for_loop_place_names(&dedent(
+        let bindings = collect_loop_place_names(&dedent(
             "
             for i in range(10):
                 a = 1
@@ -466,10 +449,7 @@ mod tests {
                 expected_bindings.insert(0, "for_loop_var");
             }
 
-            let bindings = match loop_kind {
-                LoopKind::While => collect_while_loop_place_names(&code_snippet),
-                LoopKind::For => collect_for_loop_place_names(&code_snippet),
-            };
+            let bindings = collect_loop_place_names(&code_snippet);
 
             assert_eq!(bindings, expected_bindings);
         }
