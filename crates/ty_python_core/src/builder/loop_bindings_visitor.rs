@@ -36,21 +36,14 @@ pub(crate) struct LoopBindingsVisitor {
 impl LoopBindingsVisitor {
     pub(crate) fn add_place_from_target(&mut self, target: &ast::Expr) {
         match target {
-            ast::Expr::Name(name) => {
-                self.bound_places.push(PlaceExpr::from_expr_name(name));
-            }
-            ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
                 if let Some(place) = PlaceExpr::try_from_expr(target) {
                     self.bound_places.push(place);
                 }
             }
-            ast::Expr::Tuple(tuple) => {
-                for elt in &tuple.elts {
-                    self.add_place_from_target(elt);
-                }
-            }
-            ast::Expr::List(list) => {
-                for elt in &list.elts {
+            ast::Expr::Tuple(ast::ExprTuple { elts, .. })
+            | ast::Expr::List(ast::ExprList { elts, .. }) => {
+                for elt in elts {
                     self.add_place_from_target(elt);
                 }
             }
@@ -131,15 +124,11 @@ impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
                     }
                 }
             }
-            ast::Stmt::FunctionDef(node) => {
+            ast::Stmt::FunctionDef(ast::StmtFunctionDef { name, .. })
+            | ast::Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
                 self.bound_places
-                    .push(PlaceExpr::Symbol(Symbol::new(node.name.id.clone())));
-                // Don't descend into function bodies - they're different scopes.
-            }
-            ast::Stmt::ClassDef(node) => {
-                self.bound_places
-                    .push(PlaceExpr::Symbol(Symbol::new(node.name.id.clone())));
-                // Don't descend into class bodies - they're different scopes.
+                    .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
+                // Don't descend into function or class bodies: they are different scopes.
             }
             ast::Stmt::Match(node) => {
                 self.visit_expr(&node.subject);
@@ -170,14 +159,9 @@ impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
 
     fn visit_pattern(&mut self, pattern: &'ast ast::Pattern) {
         match pattern {
-            ast::Pattern::MatchAs(p) => {
-                if let Some(name) = &p.name {
-                    self.bound_places
-                        .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
-                }
-            }
-            ast::Pattern::MatchStar(p) => {
-                if let Some(name) = &p.name {
+            ast::Pattern::MatchAs(ast::PatternMatchAs { name, .. })
+            | ast::Pattern::MatchStar(ast::PatternMatchStar { name, .. }) => {
+                if let Some(name) = name {
                     self.bound_places
                         .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
                 }
