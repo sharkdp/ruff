@@ -54,7 +54,7 @@ struct ExportFinder<'db> {
     file: File,
     visiting_stub_file: bool,
     exports: FxHashMap<&'db Name, PossibleExportKind>,
-    dunder_all: DunderAll,
+    has_dunder_all: bool,
 }
 
 impl<'db> ExportFinder<'db> {
@@ -64,7 +64,7 @@ impl<'db> ExportFinder<'db> {
             file,
             visiting_stub_file: file.is_stub(db),
             exports: FxHashMap::default(),
-            dunder_all: DunderAll::NotPresent,
+            has_dunder_all: false,
         }
     }
 
@@ -72,27 +72,23 @@ impl<'db> ExportFinder<'db> {
         self.exports.insert(export, kind);
 
         if export == "__all__" {
-            self.dunder_all = DunderAll::Present;
+            self.has_dunder_all = true;
         }
     }
 
     fn resolve_exports(self) -> Vec<Name> {
-        match self.dunder_all {
-            DunderAll::NotPresent => self
-                .exports
-                .into_iter()
-                .filter_map(|(name, kind)| {
-                    if kind == PossibleExportKind::StubImportWithoutRedundantAlias {
-                        return None;
-                    }
-                    if name.starts_with('_') {
-                        return None;
-                    }
-                    Some(name.clone())
-                })
-                .collect(),
-            DunderAll::Present => self.exports.into_keys().cloned().collect(),
+        if self.has_dunder_all {
+            return self.exports.into_keys().cloned().collect();
         }
+
+        self.exports
+            .into_iter()
+            .filter_map(|(name, kind)| {
+                (kind != PossibleExportKind::StubImportWithoutRedundantAlias
+                    && !name.starts_with('_'))
+                .then(|| name.clone())
+            })
+            .collect()
     }
 }
 
@@ -424,10 +420,4 @@ impl<'db> Visitor<'db> for WalrusFinder<'_, 'db> {
 enum PossibleExportKind {
     Normal,
     StubImportWithoutRedundantAlias,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum DunderAll {
-    NotPresent,
-    Present,
 }
