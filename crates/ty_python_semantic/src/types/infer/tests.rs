@@ -72,6 +72,17 @@ fn assert_revealed_type(db: &TestDb, filename: &str, expected: &str) {
     );
 }
 
+fn assignment_rhs_expression<'db>(
+    db: &'db TestDb,
+    filename: &str,
+    index: usize,
+) -> Expression<'db> {
+    let file = system_path_to_file(db, filename).unwrap();
+    let module = parsed_module(db, file).load(db);
+    let expression = &module.syntax().body[index].as_assign_stmt().unwrap().value;
+    semantic_index(db, file).expression(expression)
+}
+
 #[test]
 fn expected_types_are_collected_only_for_open_files() -> anyhow::Result<()> {
     let has_expected_type = |open_file: bool| -> anyhow::Result<bool> {
@@ -692,17 +703,6 @@ fn dependency_unrelated_symbol() -> anyhow::Result<()> {
 
 #[test]
 fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
-    fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
-        let file_main = system_path_to_file(db, "/src/main.py").unwrap();
-        let ast = parsed_module(db, file_main).load(db);
-        // Get the second statement in `main.py` (x = …) and extract the expression
-        // node on the right-hand side:
-        let x_rhs_node = &ast.syntax().body[1].as_assign_stmt().unwrap().value;
-
-        let index = semantic_index(db, file_main);
-        index.expression(x_rhs_node.as_ref())
-    }
-
     let mut db = setup_db();
 
     db.write_dedented(
@@ -745,7 +745,7 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
     assert_function_query_was_run(
         &db,
         infer_expression_types_impl,
-        InferExpression::Bare(x_rhs_expression(&db)),
+        InferExpression::Bare(assignment_rhs_expression(&db, "/src/main.py", 1)),
         &events,
     );
 
@@ -770,7 +770,7 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
     assert_function_query_was_not_run(
         &db,
         infer_expression_types_impl,
-        InferExpression::Bare(x_rhs_expression(&db)),
+        InferExpression::Bare(assignment_rhs_expression(&db, "/src/main.py", 1)),
         &events,
     );
 
@@ -781,17 +781,6 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
 /// doesn't trigger type inference for expressions that depend on the class's members.
 #[test]
 fn dependency_own_instance_member() -> anyhow::Result<()> {
-    fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
-        let file_main = system_path_to_file(db, "/src/main.py").unwrap();
-        let ast = parsed_module(db, file_main).load(db);
-        // Get the second statement in `main.py` (x = …) and extract the expression
-        // node on the right-hand side:
-        let x_rhs_node = &ast.syntax().body[1].as_assign_stmt().unwrap().value;
-
-        let index = semantic_index(db, file_main);
-        index.expression(x_rhs_node.as_ref())
-    }
-
     let mut db = setup_db();
 
     db.write_dedented(
@@ -838,7 +827,7 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
     assert_function_query_was_run(
         &db,
         infer_expression_types_impl,
-        InferExpression::Bare(x_rhs_expression(&db)),
+        InferExpression::Bare(assignment_rhs_expression(&db, "/src/main.py", 1)),
         &events,
     );
 
@@ -865,7 +854,7 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
     assert_function_query_was_not_run(
         &db,
         infer_expression_types_impl,
-        InferExpression::Bare(x_rhs_expression(&db)),
+        InferExpression::Bare(assignment_rhs_expression(&db, "/src/main.py", 1)),
         &events,
     );
 
@@ -874,17 +863,6 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
 
 #[test]
 fn dependency_implicit_class_member() -> anyhow::Result<()> {
-    fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
-        let file_main = system_path_to_file(db, "/src/main.py").unwrap();
-        let ast = parsed_module(db, file_main).load(db);
-        // Get the third statement in `main.py` (x = …) and extract the expression
-        // node on the right-hand side:
-        let x_rhs_node = &ast.syntax().body[2].as_assign_stmt().unwrap().value;
-
-        let index = semantic_index(db, file_main);
-        index.expression(x_rhs_node.as_ref())
-    }
-
     let mut db = setup_db();
 
     db.write_dedented(
@@ -936,7 +914,7 @@ fn dependency_implicit_class_member() -> anyhow::Result<()> {
     assert_function_query_was_run(
         &db,
         infer_expression_types_impl,
-        InferExpression::Bare(x_rhs_expression(&db)),
+        InferExpression::Bare(assignment_rhs_expression(&db, "/src/main.py", 2)),
         &events,
     );
 
@@ -965,7 +943,7 @@ fn dependency_implicit_class_member() -> anyhow::Result<()> {
     assert_function_query_was_not_run(
         &db,
         infer_expression_types_impl,
-        InferExpression::Bare(x_rhs_expression(&db)),
+        InferExpression::Bare(assignment_rhs_expression(&db, "/src/main.py", 2)),
         &events,
     );
 
