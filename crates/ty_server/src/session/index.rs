@@ -55,14 +55,6 @@ impl Index {
         Ok(DocumentHandle::from_document(document))
     }
 
-    #[expect(dead_code)]
-    pub(super) fn notebook_document_keys(&self) -> impl Iterator<Item = &DocumentKey> + '_ {
-        self.documents
-            .iter()
-            .filter(|(_, doc)| doc.as_notebook().is_some())
-            .map(|(key, _)| key)
-    }
-
     pub(super) fn update_notebook_document(
         &mut self,
         notebook_key: &DocumentKey,
