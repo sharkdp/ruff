@@ -593,6 +593,22 @@ fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definit
         .expect("no binding found")
 }
 
+fn assert_global_type(db: &TestDb, file: File, name: &str, expected: &str) {
+    let ty = global_symbol(db, file, name).place.expect_type();
+    assert_eq!(ty.display(db).to_string(), expected);
+}
+
+fn global_type_events(
+    db: &mut TestDb,
+    file: File,
+    name: &str,
+    expected: &str,
+) -> Vec<salsa::Event> {
+    db.clear_salsa_events();
+    assert_global_type(db, file, name, expected);
+    db.take_salsa_events()
+}
+
 #[test]
 fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
     let mut db = setup_db();
@@ -603,18 +619,13 @@ fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
     ])?;
 
     let a = system_path_to_file(&db, "/src/a.py").unwrap();
-    let x_ty = global_symbol(&db, a, "x").place.expect_type();
-
-    assert_eq!(x_ty.display(&db).to_string(), "int");
+    assert_global_type(&db, a, "x", "int");
 
     // Change `x` to a different value
     db.write_file("/src/foo.py", "x: bool = True\ndef foo(): ...")?;
 
     let a = system_path_to_file(&db, "/src/a.py").unwrap();
-
-    let x_ty_2 = global_symbol(&db, a, "x").place.expect_type();
-
-    assert_eq!(x_ty_2.display(&db).to_string(), "bool");
+    assert_global_type(&db, a, "x", "bool");
 
     Ok(())
 }
@@ -629,21 +640,12 @@ fn dependency_internal_symbol_change() -> anyhow::Result<()> {
     ])?;
 
     let a = system_path_to_file(&db, "/src/a.py").unwrap();
-    let x_ty = global_symbol(&db, a, "x").place.expect_type();
-
-    assert_eq!(x_ty.display(&db).to_string(), "int");
+    assert_global_type(&db, a, "x", "int");
 
     db.write_file("/src/foo.py", "x: int = 10\ndef foo(): pass")?;
 
     let a = system_path_to_file(&db, "/src/a.py").unwrap();
-
-    db.clear_salsa_events();
-
-    let x_ty_2 = global_symbol(&db, a, "x").place.expect_type();
-
-    assert_eq!(x_ty_2.display(&db).to_string(), "int");
-
-    let events = db.take_salsa_events();
+    let events = global_type_events(&mut db, a, "x", "int");
 
     assert_function_query_was_not_run(
         &db,
@@ -665,21 +667,12 @@ fn dependency_unrelated_symbol() -> anyhow::Result<()> {
     ])?;
 
     let a = system_path_to_file(&db, "/src/a.py").unwrap();
-    let x_ty = global_symbol(&db, a, "x").place.expect_type();
-
-    assert_eq!(x_ty.display(&db).to_string(), "int");
+    assert_global_type(&db, a, "x", "int");
 
     db.write_file("/src/foo.py", "x: int = 10\ny: bool = False")?;
 
     let a = system_path_to_file(&db, "/src/a.py").unwrap();
-
-    db.clear_salsa_events();
-
-    let x_ty_2 = global_symbol(&db, a, "x").place.expect_type();
-
-    assert_eq!(x_ty_2.display(&db).to_string(), "int");
-
-    let events = db.take_salsa_events();
+    let events = global_type_events(&mut db, a, "x", "int");
 
     assert_function_query_was_not_run(
         &db,
@@ -723,8 +716,7 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
     )?;
 
     let file_main = system_path_to_file(&db, "/src/main.py").unwrap();
-    let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-    assert_eq!(attr_ty.display(&db).to_string(), "int | None");
+    assert_global_type(&db, file_main, "x", "int | None");
 
     // Change the type of `attr` to `str | None`; this should trigger the type of `x` to be re-inferred
     db.write_dedented(
@@ -736,12 +728,7 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
         "#,
     )?;
 
-    let events = {
-        db.clear_salsa_events();
-        let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-        assert_eq!(attr_ty.display(&db).to_string(), "str | None");
-        db.take_salsa_events()
-    };
+    let events = global_type_events(&mut db, file_main, "x", "str | None");
     assert_function_query_was_run(
         &db,
         infer_expression_types_impl,
@@ -760,12 +747,7 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
         "#,
     )?;
 
-    let events = {
-        db.clear_salsa_events();
-        let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-        assert_eq!(attr_ty.display(&db).to_string(), "str | None");
-        db.take_salsa_events()
-    };
+    let events = global_type_events(&mut db, file_main, "x", "str | None");
 
     assert_function_query_was_not_run(
         &db,
@@ -814,8 +796,7 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
     )?;
 
     let file_main = system_path_to_file(&db, "/src/main.py").unwrap();
-    let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-    assert_eq!(attr_ty.display(&db).to_string(), "int | None");
+    assert_global_type(&db, file_main, "x", "int | None");
 
     // Change the type of `attr` to `str | None`; this should trigger the type of `x` to be re-inferred
     db.write_dedented(
@@ -829,12 +810,7 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
         "#,
     )?;
 
-    let events = {
-        db.clear_salsa_events();
-        let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-        assert_eq!(attr_ty.display(&db).to_string(), "str | None");
-        db.take_salsa_events()
-    };
+    let events = global_type_events(&mut db, file_main, "x", "str | None");
     assert_function_query_was_run(
         &db,
         infer_expression_types_impl,
@@ -855,12 +831,7 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
         "#,
     )?;
 
-    let events = {
-        db.clear_salsa_events();
-        let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-        assert_eq!(attr_ty.display(&db).to_string(), "str | None");
-        db.take_salsa_events()
-    };
+    let events = global_type_events(&mut db, file_main, "x", "str | None");
 
     assert_function_query_was_not_run(
         &db,
@@ -910,8 +881,7 @@ fn dependency_implicit_class_member() -> anyhow::Result<()> {
     )?;
 
     let file_main = system_path_to_file(&db, "/src/main.py").unwrap();
-    let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-    assert_eq!(attr_ty.display(&db).to_string(), "int");
+    assert_global_type(&db, file_main, "x", "int");
 
     // Change the type of `class_attr` to `str`; this should trigger the type of `x` to be re-inferred
     db.write_dedented(
@@ -927,12 +897,7 @@ fn dependency_implicit_class_member() -> anyhow::Result<()> {
         "#,
     )?;
 
-    let events = {
-        db.clear_salsa_events();
-        let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-        assert_eq!(attr_ty.display(&db).to_string(), "str");
-        db.take_salsa_events()
-    };
+    let events = global_type_events(&mut db, file_main, "x", "str");
     assert_function_query_was_run(
         &db,
         infer_expression_types_impl,
@@ -955,12 +920,7 @@ fn dependency_implicit_class_member() -> anyhow::Result<()> {
         "#,
     )?;
 
-    let events = {
-        db.clear_salsa_events();
-        let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
-        assert_eq!(attr_ty.display(&db).to_string(), "str");
-        db.take_salsa_events()
-    };
+    let events = global_type_events(&mut db, file_main, "x", "str");
 
     assert_function_query_was_not_run(
         &db,
