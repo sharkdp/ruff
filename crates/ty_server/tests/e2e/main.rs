@@ -61,17 +61,17 @@ use lsp_types::{
     ClientCapabilities, CompletionItem, CompletionParams, CompletionRequest, CompletionResponse,
     CompletionTriggerKind, ConfigurationParams, ConfigurationRequest, DiagnosticClientCapabilities,
     DidChangeTextDocumentNotification, DidChangeTextDocumentParams,
-    DidChangeWatchedFilesClientCapabilities, DidChangeWatchedFilesNotification,
-    DidChangeWatchedFilesParams, DidChangeWorkspaceFoldersNotification,
-    DidChangeWorkspaceFoldersParams, DidCloseTextDocumentNotification, DidCloseTextDocumentParams,
-    DidOpenTextDocumentNotification, DidOpenTextDocumentParams, DidSaveTextDocumentNotification,
-    DidSaveTextDocumentParams, DocumentDiagnosticParams, DocumentDiagnosticReport,
-    DocumentDiagnosticRequest, ExitNotification, FileEvent, FoldingRange, FoldingRangeParams,
-    Hover, HoverParams, HoverRequest, InitializeParams, InitializeRequest, InitializeResult,
-    InitializedNotification, InitializedParams, InlayHint, InlayHintClientCapabilities,
-    InlayHintParams, InlayHintRequest, LanguageKind, Notification, PartialResultParams, Position,
-    PrepareRenameRequest, PreviousResultId, PublishDiagnosticsClientCapabilities, Range, Request,
-    SemanticTokens, ShutdownRequest, SignatureHelp, SignatureHelpParams, SignatureHelpRequest,
+    DidChangeWatchedFilesNotification, DidChangeWatchedFilesParams,
+    DidChangeWorkspaceFoldersNotification, DidChangeWorkspaceFoldersParams,
+    DidCloseTextDocumentNotification, DidCloseTextDocumentParams, DidOpenTextDocumentNotification,
+    DidOpenTextDocumentParams, DidSaveTextDocumentNotification, DidSaveTextDocumentParams,
+    DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticRequest,
+    ExitNotification, FileEvent, FoldingRange, FoldingRangeParams, Hover, HoverParams,
+    HoverRequest, InitializeParams, InitializeRequest, InitializeResult, InitializedNotification,
+    InitializedParams, InlayHint, InlayHintClientCapabilities, InlayHintParams, InlayHintRequest,
+    LanguageKind, Notification, PartialResultParams, Position, PrepareRenameRequest,
+    PreviousResultId, PublishDiagnosticsClientCapabilities, Range, Request, SemanticTokens,
+    ShutdownRequest, SignatureHelp, SignatureHelpParams, SignatureHelpRequest,
     SignatureHelpTriggerKind, TextDocumentClientCapabilities, TextDocumentContentChangeEvent,
     TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, Uri,
     VersionedTextDocumentIdentifier, WorkDoneProgressParams, WorkspaceClientCapabilities,
@@ -776,21 +776,6 @@ impl TestServer {
         self.test_context.root().join(path)
     }
 
-    #[expect(dead_code)]
-    pub(crate) fn write_file(
-        &self,
-        path: impl AsRef<SystemPath>,
-        content: impl AsRef<str>,
-    ) -> Result<()> {
-        let file_path = self.file_path(path);
-        // Ensure parent directories exists
-        if let Some(parent) = file_path.parent() {
-            fs::create_dir_all(parent.as_std_path())?;
-        }
-        fs::write(file_path.as_std_path(), content.as_ref())?;
-        Ok(())
-    }
-
     /// Send a `textDocument/didOpen` notification
     pub(crate) fn open_text_document(
         &mut self,
@@ -1314,20 +1299,6 @@ impl TestServerBuilder {
         self
     }
 
-    /// Enable or disable file watching capability
-    #[expect(dead_code)]
-    pub(crate) fn enable_did_change_watched_files(mut self, enabled: bool) -> Self {
-        self.client_capabilities
-            .workspace
-            .get_or_insert_default()
-            .did_change_watched_files = if enabled {
-            Some(DidChangeWatchedFilesClientCapabilities::default())
-        } else {
-            None
-        };
-        self
-    }
-
     pub(crate) fn enable_diagnostic_related_information(mut self, enabled: bool) -> Self {
         self.client_capabilities
             .text_document
@@ -1395,13 +1366,6 @@ impl TestServerBuilder {
         self
     }
 
-    /// Set custom client capabilities (overrides any previously set capabilities)
-    #[expect(dead_code)]
-    pub(crate) fn with_client_capabilities(mut self, capabilities: ClientCapabilities) -> Self {
-        self.client_capabilities = capabilities;
-        self
-    }
-
     pub(crate) fn file_path(&self, path: impl AsRef<SystemPath>) -> SystemPathBuf {
         self.test_context.root().join(path)
     }
@@ -1422,20 +1386,6 @@ impl TestServerBuilder {
             fs::create_dir_all(parent.as_std_path())?;
         }
         fs::write(file_path.as_std_path(), content.as_ref())?;
-        Ok(self)
-    }
-
-    /// Write multiple files to the test directory
-    #[expect(dead_code)]
-    pub(crate) fn with_files<P, C, I>(mut self, files: I) -> Result<Self>
-    where
-        I: IntoIterator<Item = (P, C)>,
-        P: AsRef<SystemPath>,
-        C: AsRef<str>,
-    {
-        for (path, content) in files {
-            self = self.with_file(path, content)?;
-        }
         Ok(self)
     }
 
