@@ -166,13 +166,6 @@ pub struct SemanticTokens {
     tokens: Vec<SemanticToken>,
 }
 
-impl SemanticTokens {
-    /// Create a new `SemanticTokens` instance.
-    pub fn new(tokens: Vec<SemanticToken>) -> Self {
-        Self { tokens }
-    }
-}
-
 impl Deref for SemanticTokens {
     type Target = [SemanticToken];
 
@@ -191,7 +184,9 @@ pub fn semantic_tokens(db: &dyn Db, file: File, range: Option<TextRange>) -> Sem
     visitor.expecting_docstring = true;
     visitor.visit_body(parsed.suite());
 
-    SemanticTokens::new(visitor.tokens)
+    SemanticTokens {
+        tokens: visitor.tokens,
+    }
 }
 
 /// AST visitor that collects semantic tokens.
