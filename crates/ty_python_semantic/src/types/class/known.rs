@@ -660,117 +660,23 @@ impl KnownClass {
     ///    too soon.
     /// 2. It's probably more performant.
     pub(crate) const fn is_protocol(self) -> bool {
-        match self {
+        matches!(
+            self,
             Self::Hashable
-            | Self::SupportsIndex
-            | Self::SupportsKeysAndGetItem
-            | Self::Iterable
-            | Self::TyExtensionsAsyncIterable
-            | Self::TyExtensionsAsyncIterator
-            | Self::TyExtensionsIterable
-            | Self::Iterator
-            | Self::TyExtensionsIterator
-            | Self::AsyncIterator
-            | Self::Awaitable
-            | Self::NamedTupleLike
-            | Self::AsyncGenerator
-            | Self::Generator => true,
-
-            Self::Bool
-            | Self::Object
-            | Self::Bytes
-            | Self::Bytearray
-            | Self::Memoryview
-            | Self::Range
-            | Self::Tuple
-            | Self::Int
-            | Self::Float
-            | Self::Complex
-            | Self::FrozenSet
-            | Self::Str
-            | Self::Set
-            | Self::Dict
-            | Self::List
-            | Self::Type
-            | Self::Slice
-            | Self::Property
-            | Self::BaseException
-            | Self::BaseExceptionGroup
-            | Self::Exception
-            | Self::Warning
-            | Self::NotImplementedError
-            | Self::ExceptionGroup
-            | Self::Staticmethod
-            | Self::Classmethod
-            | Self::Deprecated
-            | Self::GenericAlias
-            | Self::GeneratorType
-            | Self::AsyncGeneratorType
-            | Self::CoroutineType
-            | Self::ModuleType
-            | Self::FunctionType
-            | Self::MethodType
-            | Self::MethodWrapperType
-            | Self::WrapperDescriptorType
-            | Self::NoneType
-            | Self::SpecialForm
-            | Self::TypeVar
-            | Self::ExtensionsTypeVar
-            | Self::ParamSpec
-            | Self::ExtensionsParamSpec
-            | Self::ParamSpecArgs
-            | Self::ParamSpecKwargs
-            | Self::TypeVarTuple
-            | Self::ExtensionsTypeVarTuple
-            | Self::Sentinel
-            | Self::TypeAliasType
-            | Self::NoDefaultType
-            | Self::NewType
-            | Self::ChainMap
-            | Self::Counter
-            | Self::DefaultDict
-            | Self::Deque
-            | Self::OrderedDict
-            | Self::Enum
-            | Self::EnumProperty
-            | Self::EnumType
-            | Self::Auto
-            | Self::Member
-            | Self::Nonmember
-            | Self::StrEnum
-            | Self::IntEnum
-            | Self::Flag
-            | Self::IntFlag
-            | Self::ABCMeta
-            | Self::Super
-            | Self::StdlibAlias
-            | Self::VersionInfo
-            | Self::EllipsisType
-            | Self::NotImplementedType
-            | Self::UnionType
-            | Self::Field
-            | Self::KwOnly
-            | Self::NamedTupleFallback
-            | Self::ConstraintSet
-            | Self::ConstraintSetSolution
-            | Self::GenericContext
-            | Self::Specialization
-            | Self::TypedDictFallback
-            | Self::ExtensionTypedDictFallback
-            | Self::BuiltinFunctionType
-            | Self::ProtocolMeta
-            | Self::Template
-            | Self::Path
-            | Self::FunctoolsPartial
-            | Self::Mapping
-            | Self::MutableMapping
-            | Self::Sequence
-            | Self::PydanticBaseModel
-            | Self::PydanticBaseSettings
-            | Self::PydanticConfigDict
-            | Self::PydanticRootModel
-            | Self::PydanticStrict => false,
-        }
+                | Self::SupportsIndex
+                | Self::SupportsKeysAndGetItem
+                | Self::Iterable
+                | Self::TyExtensionsAsyncIterable
+                | Self::TyExtensionsAsyncIterator
+                | Self::TyExtensionsIterable
+                | Self::Iterator
+                | Self::TyExtensionsIterator
+                | Self::AsyncIterator
+                | Self::Awaitable
+                | Self::NamedTupleLike
+                | Self::AsyncGenerator
+                | Self::Generator
+        )
     }
 
     /// Return `true` if this class is a typeshed fallback class which is used to provide attributes and
