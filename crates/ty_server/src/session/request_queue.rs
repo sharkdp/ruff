@@ -87,11 +87,12 @@ impl Incoming {
     ) -> Option<RequestCancellationToken> {
         let pending = self.pending.get(request_id)?;
 
-        Some(RequestCancellationToken::clone(
+        Some(
             pending
                 .cancellation_token
-                .get_or_init(RequestCancellationToken::default),
-        ))
+                .get_or_init(RequestCancellationToken::default)
+                .clone(),
+        )
     }
 
     /// Marks the request as completed.
@@ -136,7 +137,7 @@ impl PendingRequest {
 /// Token to cancel a specific request.
 ///
 /// Can be shared between threads to check for cancellation *after* a request has been scheduled.
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct RequestCancellationToken(Arc<AtomicBool>);
 
 impl RequestCancellationToken {
@@ -148,10 +149,6 @@ impl RequestCancellationToken {
     /// Signals that the request should not be processed because it was cancelled.
     fn cancel(&self) {
         self.0.store(true, std::sync::atomic::Ordering::Relaxed);
-    }
-
-    fn clone(this: &Self) -> Self {
-        RequestCancellationToken(this.0.clone())
     }
 }
 
