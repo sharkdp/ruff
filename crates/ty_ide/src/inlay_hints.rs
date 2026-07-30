@@ -8,7 +8,9 @@ use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
-use ruff_python_ast::{AnyNodeRef, ArgOrKeyword, Expr, ExprUnaryOp, Stmt, UnaryOp};
+use ruff_python_ast::{
+    AnyNodeRef, ArgOrKeyword, Expr, ExprAttribute, ExprName, ExprUnaryOp, Stmt, UnaryOp,
+};
 use ruff_python_codegen::Stylist;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_module_resolver::file_to_module;
@@ -475,23 +477,12 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
 
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
-            Expr::Name(name) => {
-                if let Some(rhs) = self.assignment_rhs {
-                    if name.ctx.is_store() {
-                        if let Some(ty) = expr.inferred_type(&self.model) {
-                            self.add_type_hint(expr, rhs, ty, !self.in_no_edits_allowed);
-                        }
-                    }
-                }
-                source_order::walk_expr(self, expr);
-            }
-            Expr::Attribute(attribute) => {
-                if let Some(rhs) = self.assignment_rhs {
-                    if attribute.ctx.is_store() {
-                        if let Some(ty) = expr.inferred_type(&self.model) {
-                            self.add_type_hint(expr, rhs, ty, !self.in_no_edits_allowed);
-                        }
-                    }
+            Expr::Name(ExprName { ctx, .. }) | Expr::Attribute(ExprAttribute { ctx, .. }) => {
+                if let Some(rhs) = self.assignment_rhs
+                    && ctx.is_store()
+                    && let Some(ty) = expr.inferred_type(&self.model)
+                {
+                    self.add_type_hint(expr, rhs, ty, !self.in_no_edits_allowed);
                 }
                 source_order::walk_expr(self, expr);
             }
