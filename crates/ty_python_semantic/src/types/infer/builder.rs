@@ -7731,27 +7731,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         listcomp: &ast::ExprListComp,
         tcx: TypeContext<'db>,
     ) {
-        let ast::ExprListComp {
-            range: _,
-            node_index: _,
-            elt,
-            generators,
-        } = listcomp;
-
-        // Infer the element type using the outer type context.
-        let elts = [[Some(elt.as_ref())]];
-        let mut infer_elt_ty =
-            |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
-
-        self.infer_collection_literal(
+        self.infer_collection_comprehension_scope(
             KnownClass::List,
-            Some(listcomp.into()),
-            &elts,
-            &mut infer_elt_ty,
+            listcomp.into(),
+            [Some(listcomp.elt.as_ref())],
+            &listcomp.generators,
             tcx,
         );
-
-        self.infer_comprehensions(generators);
     }
 
     fn infer_set_comprehension_expression_scope(
@@ -7759,22 +7745,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         setcomp: &ast::ExprSetComp,
         tcx: TypeContext<'db>,
     ) {
-        let ast::ExprSetComp {
-            range: _,
-            node_index: _,
-            elt,
-            generators,
-        } = setcomp;
+        self.infer_collection_comprehension_scope(
+            KnownClass::Set,
+            setcomp.into(),
+            [Some(setcomp.elt.as_ref())],
+            &setcomp.generators,
+            tcx,
+        );
+    }
 
+    fn infer_collection_comprehension_scope<const N: usize>(
+        &mut self,
+        collection_class: KnownClass,
+        expression: ast::ExprRef<'_>,
+        elements: [Option<&ast::Expr>; N],
+        generators: &[ast::Comprehension],
+        tcx: TypeContext<'db>,
+    ) {
         // Infer the element type using the outer type context.
-        let elts = [[Some(elt.as_ref())]];
         let mut infer_elt_ty =
             |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
 
         self.infer_collection_literal(
-            KnownClass::Set,
-            Some(setcomp.into()),
-            &elts,
+            collection_class,
+            Some(expression),
+            &[elements],
             &mut infer_elt_ty,
             tcx,
         );
@@ -7787,35 +7782,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         dictcomp: &ast::ExprDictComp,
         tcx: TypeContext<'db>,
     ) {
-        let ast::ExprDictComp {
-            range: _,
-            node_index: _,
-            key,
-            value,
-            generators,
-        } = dictcomp;
-
-        if key.is_some() {
-            // Infer the key and value types using the outer type context.
-            let elts = [[key.as_deref(), Some(value.as_ref())]];
-            let mut infer_elt_ty =
-                |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
-
-            self.infer_collection_literal(
+        if let Some(key) = dictcomp.key.as_deref() {
+            self.infer_collection_comprehension_scope(
                 KnownClass::Dict,
-                Some(dictcomp.into()),
-                &elts,
-                &mut infer_elt_ty,
+                dictcomp.into(),
+                [Some(key), Some(dictcomp.value.as_ref())],
+                &dictcomp.generators,
                 tcx,
             );
         } else {
             // Dict-unpack comprehensions are typed by the outer expression inference. Inferring
             // them through the collection-literal helper here would report the same invalid
             // mapping diagnostic twice.
-            self.infer_expression(value, TypeContext::default());
+            self.infer_expression(&dictcomp.value, TypeContext::default());
+            self.infer_comprehensions(&dictcomp.generators);
         }
-
-        self.infer_comprehensions(generators);
     }
 
     fn infer_comprehensions(&mut self, comprehensions: &[ast::Comprehension]) {
