@@ -22,7 +22,7 @@ use crate::place::{DefinedPlace, Place};
 use crate::types::callable::CallableTypeKind;
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::constraints::ConstraintSetBuilder;
-use crate::types::function::{FunctionType, OverloadLiteral};
+use crate::types::function::FunctionType;
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{
     CallableSignature, Parameter, Parameters, ParametersKind, Signature,
@@ -1609,59 +1609,6 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
 }
 
 impl Display for DisplayTuple<'_, '_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        self.fmt_detailed(&mut TypeWriter::Formatter(f))
-    }
-}
-
-impl<'db> OverloadLiteral<'db> {
-    // Not currently used, but useful for debugging.
-    #[expect(dead_code)]
-    pub(crate) fn display(self, db: &'db dyn Db) -> DisplayOverloadLiteral<'db> {
-        Self::display_with(self, db, DisplaySettings::default())
-    }
-
-    fn display_with(
-        self,
-        db: &'db dyn Db,
-        settings: DisplaySettings<'db>,
-    ) -> DisplayOverloadLiteral<'db> {
-        DisplayOverloadLiteral {
-            literal: self,
-            db,
-            settings,
-        }
-    }
-}
-
-pub(crate) struct DisplayOverloadLiteral<'db> {
-    literal: OverloadLiteral<'db>,
-    db: &'db dyn Db,
-    settings: DisplaySettings<'db>,
-}
-
-impl<'db> FmtDetailed<'db> for DisplayOverloadLiteral<'db> {
-    fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        let signature = self.literal.signature(self.db);
-        let hide_unused_self = signature.should_hide_self_from_display(self.db);
-        let type_parameters = DisplayOptionalGenericContext {
-            generic_context: signature.generic_context.as_ref(),
-            db: self.db,
-            settings: self.settings.clone(),
-            hide_unused_self,
-        };
-
-        f.set_invalid_type_annotation();
-        f.write_str("def ")?;
-        write!(f, "{}", self.literal.name(self.db))?;
-        type_parameters.fmt_detailed(f)?;
-        signature
-            .display_with(self.db, self.settings.disallow_signature_name())
-            .fmt_detailed(f)
-    }
-}
-
-impl Display for DisplayOverloadLiteral<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.fmt_detailed(&mut TypeWriter::Formatter(f))
     }
