@@ -74,10 +74,7 @@ impl TupleLength {
 
     /// Returns the maximum length of this tuple, if any.
     pub(crate) fn maximum(self) -> Option<usize> {
-        match self {
-            TupleLength::Fixed(len) => Some(len),
-            TupleLength::Variable(_, _) => None,
-        }
+        self.into_fixed_length()
     }
 
     /// Given two [`TupleLength`]s, return the more precise instance,
