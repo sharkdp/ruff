@@ -883,35 +883,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             builder: self.builder,
         }
     }
-
-    #[expect(dead_code)] // Keep this around for debugging purposes
-    pub(crate) fn display_graph<'a>(
-        self,
-        db: &'db dyn Db,
-        prefix: &'a dyn Display,
-    ) -> impl Display {
-        struct DisplayConstraintSet<'a, 'c, 'db> {
-            node: NodeId,
-            prefix: &'a dyn Display,
-            db: &'db dyn Db,
-            builder: &'c ConstraintSetBuilder<'db>,
-        }
-
-        impl Display for DisplayConstraintSet<'_, '_, '_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let mut storage = self.builder.storage.borrow_mut();
-                let node = self.node.simplify_for_display(self.db, &mut storage);
-                Display::fmt(&node.display_graph(self.db, &storage, self.prefix), f)
-            }
-        }
-
-        DisplayConstraintSet {
-            node: self.node,
-            prefix,
-            db,
-            builder: self.builder,
-        }
-    }
 }
 
 impl Debug for ConstraintSet<'_, '_> {
@@ -3495,6 +3466,7 @@ impl NodeId {
     ///     │       └─₀ never
     ///     └─₀ never
     /// ```
+    #[cfg(test)]
     fn display_graph<'db, 'a>(
         self,
         db: &'db dyn Db,
@@ -3527,8 +3499,6 @@ impl NodeId {
                     }
                     let interior = storage.interior_node_data(node);
                     write!(f, "<{index}> {}", interior.constraint.display(db, storage))?;
-                    // Calling display_graph recursively here causes rustc to claim that the
-                    // expect(unused) up above is unfulfilled!
                     write!(f, "\n{prefix}┡━₁ ")?;
                     format_node(
                         db,
